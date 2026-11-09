@@ -1,0 +1,1 @@
+{{ collect($sortedVisibleShelfBooks)->map('trim') }}

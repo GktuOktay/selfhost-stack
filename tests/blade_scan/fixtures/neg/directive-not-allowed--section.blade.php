@@ -1,0 +1,2 @@
+@section('x')
+@endsection

@@ -1,0 +1,1 @@
+{{ $shelf->loadMissing('books') }}

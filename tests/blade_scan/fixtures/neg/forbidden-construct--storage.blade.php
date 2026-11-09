@@ -1,0 +1,1 @@
+{{ Storage::get('x') }}

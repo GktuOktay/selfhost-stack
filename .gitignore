@@ -1,0 +1,8 @@
+local/
+.env
+*.env
+!.env.example
+*.override.yaml
+!*.override.yaml.example
+__pycache__/
+.DS_Store

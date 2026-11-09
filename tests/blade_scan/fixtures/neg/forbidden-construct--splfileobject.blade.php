@@ -1,0 +1,1 @@
+{{ new SplFileObject('x') }}

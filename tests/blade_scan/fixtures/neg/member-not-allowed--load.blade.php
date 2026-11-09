@@ -1,0 +1,1 @@
+{{ $shelf->load('books') }}

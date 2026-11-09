@@ -1,0 +1,3 @@
+@if($loop)
+x
+@endif

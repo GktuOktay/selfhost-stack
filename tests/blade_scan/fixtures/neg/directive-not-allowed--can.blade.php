@@ -1,0 +1,2 @@
+@can('x')
+@endcan

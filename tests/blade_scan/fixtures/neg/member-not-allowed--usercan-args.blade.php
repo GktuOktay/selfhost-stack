@@ -1,0 +1,1 @@
+{{ userCan('settings-manage', $shelf) }}

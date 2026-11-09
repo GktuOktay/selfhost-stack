@@ -1,0 +1,22 @@
+# Pinned upstream for the override views in this theme (spec 0002 section 6.1).
+# Grammar: blank | # comment | BOOKSTACK_IMAGE=<v> (exactly one) | VIEW_ROOT=<path> (exactly one)
+#          | VIEW <relative path> <64 hex sha256> (0..n, unique path) | ALLOW <relative path> (1..n, unique path)
+# BOOKSTACK_IMAGE must equal the BookStack image in the normalized compose config, byte for byte.
+# A bump PR changes this line and the BookStack line in versions.env, nothing else (M-1).
+BOOKSTACK_IMAGE=lscr.io/linuxserver/bookstack:v26.09.2-ls295@sha256:33f61a72d9aaa021f7e687987b9fcb992673d9ca3fc08f63f5ddaddf59e94efc
+VIEW_ROOT=/app/www/resources/views
+
+# sha256 of the original views inside the image above (v26.09.2-ls295, arm64 measured in T-0b/T-3)
+VIEW home/default.blade.php 566ef9ce18437aeea4e50d6a8e670aa2a86da4de9467ddfc17caf49c1db9a33c
+VIEW shelves/show.blade.php c9b32a3fbec368c1f449f4553db73fc1c969bd6f9d7a55b56b05a02386e9ed7a
+
+# every file in this theme folder, meta files included
+ALLOW ACCESS_ALLOWLIST
+ALLOW PHP_ALLOWLIST
+ALLOW README
+ALLOW UPSTREAM
+ALLOW home/default.blade.php
+ALLOW selfhost/cards.blade.php
+ALLOW selfhost/home.blade.php
+ALLOW selfhost/shelf.blade.php
+ALLOW shelves/show.blade.php

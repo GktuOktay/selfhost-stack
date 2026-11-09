@@ -1,0 +1,1 @@
+{{ trim(strrev('x')) }}

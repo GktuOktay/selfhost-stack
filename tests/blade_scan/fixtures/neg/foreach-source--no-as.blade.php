@@ -1,0 +1,3 @@
+@foreach($shelf)
+x
+@endforeach
