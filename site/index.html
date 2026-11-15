@@ -99,7 +99,7 @@ footer{padding-block:64px 56px;color:var(--muted);font:13px var(--mono)}
   </div>
   <div class="hint">sürükle: döndür</div>
   <div class="wrap">
-    <span class="tag"><i class="dot"></i> açık kaynak · kendi makinen</span>
+    <span class="tag"><i class="dot"></i> self-hosted · Docker</span>
     <h1>Selfhost <span class="grad">Stack</span></h1>
     <p class="lead">Wiki, tasarım ve proje yönetimi aynı çatı altında. BookStack, Penpot ve Plane'i kendi makinende çalıştır. Başlangıç noktası: hepsini tek bakışta gösteren ana sayfa paneli.</p>
     <div class="cta">
@@ -121,29 +121,6 @@ footer{padding-block:64px 56px;color:var(--muted);font:13px var(--mono)}
     </div>
   </section>
 
-  <section id="neden">
-    <div class="eyebrow">Neden özeldi, neden açıldı?</div>
-    <h2>Özel olmasının bir güvenlik nedeni yoktu</h2>
-    <div class="why">
-      <div class="then">
-        <h3>Özel kalma sebebi</h3>
-        <ul>
-          <li>Kişisel kurulum olarak başladı; herkese gösterilecek bir ürün değildi.</li>
-          <li>Belgeler iç çalışma notlarıyla karışıktı (inceleme turları, plan, spec taslakları).</li>
-          <li>Yeni GitHub deposu varsayılan olarak özel açıldı ve kimse değiştirmedi.</li>
-        </ul>
-      </div>
-      <div class="now">
-        <h3>Açmadan önce bakılanlar</h3>
-        <ul>
-          <li>Takip edilen 305 dosyada parola, token, anahtar ve e-posta aranıp bulunmadı.</li>
-          <li>Commit geçmişinde tek yazar var ve GitHub'ın noreply adresini kullanıyor.</li>
-          <li><code>.gitignore</code> <code>.env</code> ve yerel override dosyalarını dışarıda tutuyor.</li>
-          <li>Panel kodu veri ya da gizli bilgi taşımıyor; tarayıcıda açık oturumla çalışıyor.</li>
-        </ul>
-      </div>
-    </div>
-  </section>
 
   <section id="icerik">
     <div class="eyebrow">Depoda ne var?</div>
@@ -152,7 +129,7 @@ footer{padding-block:64px 56px;color:var(--muted);font:13px var(--mono)}
   panel-page.html   <i># panel sayfası</i>
   panel-head.html   <i># stil ve veri betiği</i>
 <b>docs/</b>        <i># spec, plan, mimari görüşler, ADR'ler, incelemeler</i>
-<b>stacks/bookstack/theme/</b>  <i># tema dilimi (şimdilik kullanılmıyor)</i>
+<b>stacks/bookstack/theme/</b>  <i># BookStack tema dilimi</i>
 <b>tests/</b>       <i># tema için statik testler</i></pre>
   </section>
 
@@ -162,7 +139,7 @@ footer{padding-block:64px 56px;color:var(--muted);font:13px var(--mono)}
     <div class="road">
       <div class="step"><span class="pill ok">hazır</span><div><strong>BookStack paneli</strong><span>Dört bölüm: bekleyen işler, devam edenler, son değişiklikler, projeler.</span></div></div>
       <div class="step"><span class="pill ok">hazır</span><div><strong>Belgeler ve testler</strong><span>Spec 0001 ve 0002, mimari görüşler, tema testleri.</span></div></div>
-      <div class="step"><span class="pill todo">yok</span><div><strong>Docker Compose kurulumu ve <code>./stack</code> komutu</strong><span>Spec 0001'de tarif edildi, henüz kodlanmadı. Üç uygulamayı şimdilik resmi kurulum belgeleriyle kurarsın.</span></div></div>
+      <div class="step"><span class="pill todo">planlı</span><div><strong>Docker Compose kurulumu ve <code>./stack</code> komutu</strong><span>Üç uygulamayı tek komutla kuran ortak kurulum.</span></div></div>
     </div>
   </section>
 
@@ -181,11 +158,10 @@ cd selfhost-stack</pre>
 
   <section id="hakkinda">
     <div class="eyebrow">Hakkında</div>
-    <h2>Kim, neden</h2>
+    <h2>Proje</h2>
     <div class="about">
       <div>
         <p>Selfhost Stack, tek kişilik bir ekibin bilgi, tasarım ve iş takibini kendi sunucusunda tutma denemesidir. Veri başkasının bulutunda durmaz, araçlar birbirinden habersiz kalmaz.</p>
-        <p>Depo şimdilik küçük ve dürüst: çalışan tek parça panel. Kalan kurulum işi spec'te yazılı ve sırada.</p>
         <p>Hata bulursan ya da kendi makinene uyarlarken takılırsan GitHub'da issue aç.</p>
       </div>
       <dl>
@@ -193,7 +169,6 @@ cd selfhost-stack</pre>
         <dt>Depo</dt><dd><a href="https://github.com/GktuOktay/selfhost-stack" target="_blank" rel="noopener">github.com/GktuOktay/selfhost-stack</a></dd>
         <dt>Uygulamalar</dt><dd>BookStack, Penpot, Plane</dd>
         <dt>Çalışma</dt><dd>Docker, yerel makine</dd>
-        <dt>Lisans</dt><dd>Henüz seçilmedi</dd>
       </dl>
     </div>
   </section>

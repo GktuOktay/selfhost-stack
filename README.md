@@ -6,20 +6,16 @@ BookStack, Penpot ve Plane'i kendi makinende çalıştırmak için tek merkez. D
 
 Tanıtım sayfası (3D, animasyonlu): [`site/index.html`](site/index.html). Tarayıcıda aç.
 
-## Şu an depoda ne var
+## İçerik
 
 | Klasör | İçerik | Durum |
 |---|---|---|
 | `dashboard/` | BookStack ana sayfa paneli | Çalışıyor |
 | `site/` | Tanıtım sayfası (tek HTML dosyası) | Hazır |
 | `docs/` | Spec 0001 (üç uygulamanın ortak kurulumu), spec 0002 (panel), incelemeler, mimari notlar | Belge |
-| `stacks/bookstack/theme/`, `tests/` | BookStack theme dilimi ve statik testleri | Kullanılmıyor, ileride için duruyor |
+| `stacks/bookstack/theme/`, `tests/` | BookStack theme dilimi ve statik testleri | Planlı |
 
-Henüz yok: BookStack, Penpot ve Plane'in Docker Compose kurulumu ve `./stack` komutu. Spec 0001 bunu tarif ediyor ama kodlanmadı. Bu üç uygulamayı başka makinede kurmak için şimdilik her birinin resmi Docker kurulum belgesini elle uygulaman gerekir.
-
-## Depo neden özeldi, neden açıldı
-
-Kişisel bir kurulum olarak başladı ve GitHub'da varsayılan olarak özel açıldı. Özel kalması için bir güvenlik nedeni yoktu. Açmadan önce takip edilen dosyalarda parola, token, anahtar ve e-posta arandı, bulunmadı. `docs/` altındaki belgeler iç çalışma notlarıdır (inceleme turları, plan, spec taslakları); yerel dosya yolları içerir ve olduğu gibi bırakıldı.
+Planlı: üç uygulamayı tek komutla kuran Docker Compose kurulumu ve `./stack` komutu (spec 0001). O zamana kadar her uygulama kendi resmi Docker kurulumuyla kurulur.
 
 ## Gereksinimler
 
@@ -59,7 +55,3 @@ Ayrıntı ve geri alma adımları: [`dashboard/README.md`](dashboard/README.md).
 
 - Parola, token ve `.env` dosyalarını depoya ekleme. `.gitignore` bunları dışarıda tutar.
 - Panel tarayıcıda, açık oturumun yetkisiyle BookStack API'sini okur. Ayrı bir token kullanmaz.
-
-## Lisans
-
-Henüz seçilmedi. Lisans dosyası eklenene kadar kodu yeniden kullanma hakkı verilmiş sayılmaz.
