@@ -1,0 +1,551 @@
+#!/bin/bash
+# stack: selfhost-stack CLI (bash 3.2 uyumlu; bash 4+ özellikleri yok).
+#
+# Kullanım:
+#   ./stack init
+#   ./stack up|down|status|backup [bookstack|penpot|plane|all]   (argümansız = all)
+#   ./stack logs <bookstack|penpot|plane> [servis] [-f]
+# Env: yalnız HEALTH_TIMEOUT (sn, varsayılan 600) ve STACK_LOCAL_DIR (mutlak yol).
+# Çıkış kodları: 0 ok · 1 kullanım · 2 ön koşul · 3 port dolu · 4 health zaman aşımı
+#                5 yedek/başlatma hatası · 6 güvenlik kapısı
+#
+# ---------------------------------------------------------------------------
+# HOOK SÖZLEŞMESİ (stacks/<app>/hooks.sh; T-2/T-3/T-4 bunu uygular)
+# ---------------------------------------------------------------------------
+# `stack`, compose ve hooks.sh'i yalnız stacks/<app>/ altında arar:
+#   compose:  docker compose -p selfhost-<app> -f stacks/<app>/compose.yaml --env-file <LOCAL>/.env
+#   hooks.sh: her çağrıda ALT KABUKTA `. hooks.sh` ile yüklenir, sonra tek fonksiyon çağrılır.
+#             hooks.sh yalnız fonksiyon tanımlar (yan etki yok). `set -u` açıktır, `set -e` kapalı.
+# Hook'a verilen ortam (export): STACK_APP STACK_PORT STACK_PORT_KEY STACK_URL
+#   (http://127.0.0.1:<port>) STACK_PROJECT STACK_ROOT STACK_LOCAL STACK_ENV_FILE
+# Hook'un kullanabileceği yardımcılar (stack tanımlar):
+#   stack_compose <compose args...>   bu uygulamanın compose çağrısı
+#   stack_env KEY                     local/.env değeri (izinli anahtar; ARGV'ye secret koyma:
+#                                     secret'ı `exec -e`/stdin/container ortamı ile geçir)
+# Hook çıktısı (stdout+stderr) `stack` tarafından secret maskeleyiciden geçirilir.
+# Fonksiyonlar (dönüş kodu 0 = başarı; 99 ayrılmıştır = "tanımsız"):
+#   app_health      ZORUNLU. 0 = sağlıklı. Sessiz olmalı, kısa zaman aşımlı (curl -m 5).
+#   app_bootstrap   Opsiyonel. Sağlıklı olduktan sonra, İDEMPOTENT: admin oluştur/varsayılanı kaldır.
+#                   0 değilse up exit 5.
+#   app_gate        Opsiyonel. Güvenlik kapısı (REQ-15): 0 = geçti, 6 = geçmedi (yönergeyi stdout'a
+#                   yaz, "HATA:" ile başlatma; stack tek HATA satırını kendisi basar). Diğer kod = 5.
+#   app_status_extra Opsiyonel. `status`ta uygulamanın altına girintili basılacak satırlar
+#                   (örn. "default-login: no", "plane-admin: unclaimed").
+#   app_up_note     Opsiyonel. Başarı satırından sonra basılır (ilk kurulumda admin e-postası ve
+#                   parolanın .env ANAHTAR ADI; parolanın kendisi asla).
+#   app_backup <hedef_dizin>  T-5. Dizin 700 önceden açılır; db.sql + volume tar'ları yazılır (600).
+# ---------------------------------------------------------------------------
+
+set -u
+umask 077
+LC_ALL=C
+export LC_ALL
+
+ROOT=$(cd "$(dirname "$0")" && pwd -P) || exit 2
+ALL_APPS="bookstack penpot plane"
+SECRET_KEYS="BOOKSTACK_DB_PASSWORD BOOKSTACK_DB_ROOT_PASSWORD BOOKSTACK_APP_KEY BOOKSTACK_ADMIN_PASSWORD PENPOT_SECRET_KEY PENPOT_DB_PASSWORD PLANE_SECRET_KEY PLANE_LIVE_SECRET_KEY PLANE_DB_PASSWORD PLANE_RABBITMQ_PASSWORD PLANE_STORAGE_ACCESS_KEY PLANE_STORAGE_SECRET_KEY"
+ALL_KEYS="BOOKSTACK_PORT BOOKSTACK_DB_PASSWORD BOOKSTACK_DB_ROOT_PASSWORD BOOKSTACK_APP_KEY BOOKSTACK_ADMIN_EMAIL BOOKSTACK_ADMIN_PASSWORD PENPOT_PORT PENPOT_SECRET_KEY PENPOT_DB_PASSWORD PENPOT_EXTRA_FLAGS PLANE_PORT PLANE_SECRET_KEY PLANE_LIVE_SECRET_KEY PLANE_DB_PASSWORD PLANE_RABBITMQ_PASSWORD PLANE_STORAGE_ACCESS_KEY PLANE_STORAGE_SECRET_KEY"
+
+SECRETS_FILE=""
+ENV_TMP=""
+cleanup() {
+  [ -n "$SECRETS_FILE" ] && rm -f "$SECRETS_FILE"
+  [ -n "$ENV_TMP" ] && rm -f "$ENV_TMP"
+  return 0
+}
+trap cleanup EXIT
+trap 'exit 130' INT TERM
+
+err() { printf 'HATA: %s\n' "$*" >&2; }
+die() { local rc=$1; shift; err "$*"; exit "$rc"; }
+info() { printf '%s\n' "$*"; }
+warn() { printf 'UYARI: %s\n' "$*"; }
+safe() { printf '%s' "$1" | tr -cd 'A-Za-z0-9_.@:/-' | cut -c1-40; }
+getvar() { local n=$1; printf '%s' "${!n:-}"; }
+
+# ---------- yollar ----------
+if [ -n "${STACK_LOCAL_DIR:-}" ]; then
+  case $STACK_LOCAL_DIR in
+    /*) ;;
+    *) die 2 "STACK_LOCAL_DIR mutlak yol olmalı" ;;
+  esac
+  case $STACK_LOCAL_DIR in
+    */../*|*/..) die 2 "STACK_LOCAL_DIR '..' içeremez" ;;
+  esac
+  LOCAL=${STACK_LOCAL_DIR%/}
+  LOCAL_CUSTOM=1
+else
+  LOCAL=$ROOT/local
+  LOCAL_CUSTOM=0
+fi
+ENVFILE=$LOCAL/.env
+TEMPLATE=$ROOT/local.example/.env.example
+
+HEALTH_TIMEOUT=${HEALTH_TIMEOUT:-600}
+case $HEALTH_TIMEOUT in
+  ''|*[!0-9]*|0*) die 2 "HEALTH_TIMEOUT pozitif tam sayı (sn) olmalı" ;;
+esac
+[ ${#HEALTH_TIMEOUT} -le 6 ] || die 2 "HEALTH_TIMEOUT çok büyük"
+
+# ---------- anahtar tabloları ----------
+app_keys() {
+  case $1 in
+    bookstack) echo "BOOKSTACK_PORT BOOKSTACK_DB_PASSWORD BOOKSTACK_DB_ROOT_PASSWORD BOOKSTACK_APP_KEY BOOKSTACK_ADMIN_EMAIL BOOKSTACK_ADMIN_PASSWORD" ;;
+    penpot) echo "PENPOT_PORT PENPOT_SECRET_KEY PENPOT_DB_PASSWORD" ;;
+    plane) echo "PLANE_PORT PLANE_SECRET_KEY PLANE_LIVE_SECRET_KEY PLANE_DB_PASSWORD PLANE_RABBITMQ_PASSWORD PLANE_STORAGE_ACCESS_KEY PLANE_STORAGE_SECRET_KEY" ;;
+  esac
+}
+port_key() {
+  case $1 in
+    bookstack) echo BOOKSTACK_PORT ;;
+    penpot) echo PENPOT_PORT ;;
+    plane) echo PLANE_PORT ;;
+  esac
+}
+is_allowed_key() {
+  local k
+  for k in $ALL_KEYS; do [ "$k" = "$1" ] && return 0; done
+  return 1
+}
+
+# ---------- local/.env ayrıştırıcı (satır satır; source/eval yok) ----------
+# Değerler ENV_<KEY>, satır numaraları ENVLINE_<KEY> değişkenlerine yazılır.
+load_env() {
+  local f=$1 n=0 line key val v2
+  while IFS= read -r line || [ -n "$line" ]; do
+    n=$((n + 1))
+    case $line in ''|'#'*) continue ;; esac
+    case $line in *=*) ;; *) die 2 "$f:$n: satır KEY=değer biçiminde değil" ;; esac
+    key=${line%%=*}
+    val=${line#*=}
+    case $key in
+      ''|[!A-Z]*|*[!A-Z0-9_]*) die 2 "$f:$n: geçersiz anahtar adı (BÜYÜK_HARF, export/boşluk yok)" ;;
+    esac
+    is_allowed_key "$key" || die 2 "$f:$n: izin verilmeyen anahtar $key"
+    [ -z "$(getvar "ENVLINE_$key")" ] || die 2 "$f:$n: $key tekrar tanımlı"
+    v2=$val
+    [ "$key" = PENPOT_EXTRA_FLAGS ] && v2=${val// /}
+    case $v2 in
+      *[!A-Za-z0-9_@.:+/=-]*) die 2 "$f:$n: $key değerinde izin verilmeyen karakter" ;;
+    esac
+    case $val in
+      __GENERATE*) die 2 "$f:$n: $key üretilmemiş; ./stack init çalıştır" ;;
+    esac
+    printf -v "ENV_$key" '%s' "$val"
+    printf -v "ENVLINE_$key" '%s' "$n"
+  done < "$f"
+}
+
+require_keys() {
+  local k v l
+  for k in $1; do
+    l=$(getvar "ENVLINE_$k")
+    [ -n "$l" ] || die 2 "$ENVFILE: eksik anahtar $k (./stack init çalıştır)"
+    v=$(getvar "ENV_$k")
+    [ -n "$v" ] || die 2 "$ENVFILE:$l: $k boş olamaz"
+  done
+}
+
+validate_ports() {
+  local app k v l seen=" "
+  for app in $ALL_APPS; do
+    k=$(port_key "$app")
+    l=$(getvar "ENVLINE_$k")
+    [ -n "$l" ] || die 2 "$ENVFILE: eksik anahtar $k (./stack init çalıştır)"
+    v=$(getvar "ENV_$k")
+    case $v in
+      ''|*[!0-9]*) die 2 "$ENVFILE:$l: $k sayı olmalı (1024-65535)" ;;
+    esac
+    [ ${#v} -le 5 ] && [ "$((10#$v))" -ge 1024 ] && [ "$((10#$v))" -le 65535 ] ||
+      die 2 "$ENVFILE:$l: $k 1024-65535 aralığında olmalı"
+    v=$((10#$v))
+    printf -v "ENV_$k" '%s' "$v"
+    case $seen in *" $v "*) die 2 "$ENVFILE:$l: $k başka bir uygulamayla aynı port" ;; esac
+    seen="$seen$v "
+  done
+}
+
+# ---------- maskeleyici (değere göre) ----------
+build_mask() {
+  local k v
+  SECRETS_FILE=$(mktemp "${TMPDIR:-/tmp}/stack-mask.XXXXXX") || die 2 "geçici dosya açılamadı"
+  chmod 600 "$SECRETS_FILE"
+  for k in $SECRET_KEYS; do
+    v=$(getvar "ENV_$k")
+    [ ${#v} -ge 6 ] || continue
+    printf '%s\n' "$v"
+    [ "$k" = BOOKSTACK_APP_KEY ] && printf '%s\n' "${v#base64:}"
+  done | awk '{ print length($0) "\t" $0 }' | sort -rn | cut -f2- > "$SECRETS_FILE"
+}
+mask() {
+  if [ -n "$SECRETS_FILE" ] && [ -s "$SECRETS_FILE" ]; then
+    awk 'NR == FNR { s[n++] = $0; next }
+         { l = $0
+           for (i = 0; i < n; i++) { while ((p = index(l, s[i])) > 0) l = substr(l, 1, p - 1) "***" substr(l, p + length(s[i])) }
+           print l; fflush() }' "$SECRETS_FILE" -
+  else
+    cat
+  fi
+}
+
+# ---------- araçlar ----------
+need_cmd() { command -v "$1" >/dev/null 2>&1 || die 2 "$1 bulunamadı; kur ve PATH'e ekle"; }
+need_runtime_tools() {
+  need_cmd docker
+  docker compose version >/dev/null 2>&1 || die 2 "docker compose (v2) bulunamadı; Docker Desktop/Compose v2 kur"
+  docker info >/dev/null 2>&1 || die 2 "Docker erişilemiyor; Docker'ı başlat"
+  need_cmd curl
+  command -v lsof >/dev/null 2>&1 || command -v nc >/dev/null 2>&1 || die 2 "lsof (veya nc) bulunamadı; kur ve PATH'e ekle"
+}
+local_hint() { [ "$LOCAL_CUSTOM" = 1 ] && printf 'local/.env (%s)' "$ENVFILE" || printf 'local/.env'; }
+
+# ---------- uygulama bağlamı ve hook'lar ----------
+set_ctx() {
+  STACK_APP=$1
+  STACK_PORT_KEY=$(port_key "$1")
+  STACK_PORT=$(getvar "ENV_$STACK_PORT_KEY")
+  STACK_URL=http://127.0.0.1:$STACK_PORT
+  STACK_PROJECT=selfhost-$1
+  STACK_ROOT=$ROOT
+  STACK_LOCAL=$LOCAL
+  STACK_ENV_FILE=$ENVFILE
+}
+stack_compose() {
+  docker compose -p "selfhost-$STACK_APP" -f "$ROOT/stacks/$STACK_APP/compose.yaml" --env-file "$ENVFILE" "$@"
+}
+stack_env() {
+  is_allowed_key "$1" || return 1
+  getvar "ENV_$1"
+}
+hooks_file() { printf '%s/stacks/%s/hooks.sh' "$ROOT" "$1"; }
+hook_defined() {
+  [ -f "$(hooks_file "$1")" ] || return 1
+  ( . "$(hooks_file "$1")" >/dev/null 2>&1; [ "$(type -t "$2")" = function ] )
+}
+run_hook() { # app fn [args...]; 99 = hook tanımsız
+  local app=$1 fn=$2
+  shift 2
+  (
+    export STACK_APP STACK_PORT STACK_PORT_KEY STACK_URL STACK_PROJECT STACK_ROOT STACK_LOCAL STACK_ENV_FILE
+    . "$(hooks_file "$app")" || exit 98
+    [ "$(type -t "$fn")" = function ] || exit 99
+    "$fn" "$@"
+  )
+}
+check_app_files() { # app; yoksa dönüş 2
+  if [ ! -f "$ROOT/stacks/$1/compose.yaml" ]; then err "stacks/$1/compose.yaml yok"; return 2; fi
+  if [ ! -f "$(hooks_file "$1")" ]; then err "stacks/$1/hooks.sh yok"; return 2; fi
+  return 0
+}
+
+# ---------- port ve mimari ----------
+port_listening() {
+  if command -v lsof >/dev/null 2>&1; then
+    lsof -nP -iTCP:"$1" -sTCP:LISTEN >/dev/null 2>&1
+  else
+    nc -z 127.0.0.1 "$1" >/dev/null 2>&1
+  fi
+}
+port_is_foreign() { # port app: 0 = başkası tutuyor
+  port_listening "$1" || return 1
+  [ -z "$(docker ps -q --filter "publish=$1" --filter "label=com.docker.compose.project=selfhost-$2" 2>/dev/null)" ]
+}
+host_arch() {
+  case $(uname -m) in
+    arm64|aarch64) echo arm64 ;;
+    x86_64|amd64) echo amd64 ;;
+    *) uname -m ;;
+  esac
+}
+warn_emulation() {
+  local host img arch
+  host=$(host_arch)
+  for img in $(stack_compose config --images 2>/dev/null); do
+    arch=$(docker image inspect --format '{{.Architecture}}' "$img" 2>/dev/null) || continue
+    [ -n "$arch" ] && [ "$arch" != "$host" ] && warn "$img $arch emülasyonla çalışıyor"
+  done
+  return 0
+}
+
+wait_health() { # app
+  local start=$SECONDS el left
+  while :; do
+    run_hook "$1" app_health >/dev/null 2>&1 && return 0
+    el=$((SECONDS - start))
+    [ "$el" -ge "$HEALTH_TIMEOUT" ] && return 1
+    info "bekleniyor $1 $el/$HEALTH_TIMEOUT sn"
+    left=$((HEALTH_TIMEOUT - el))
+    [ "$left" -gt 5 ] && left=5
+    sleep "$left"
+  done
+}
+
+# ---------- komutlar ----------
+up_app() {
+  local app=$1 rc
+  set_ctx "$app"
+  check_app_files "$app" || return 2
+  hook_defined "$app" app_health || { err "stacks/$app/hooks.sh app_health tanımlamıyor"; return 2; }
+  if port_is_foreign "$STACK_PORT" "$app"; then
+    err "port $STACK_PORT dolu ($app): $STACK_PORT_KEY değerini $(local_hint) içinde değiştir"
+    return 3
+  fi
+  stack_compose up -d --pull missing 2>&1 | mask
+  [ "${PIPESTATUS[0]}" -eq 0 ] || { err "$app başlatılamadı (docker compose up)"; return 5; }
+  warn_emulation
+  wait_health "$app" || { err "$app $HEALTH_TIMEOUT sn içinde sağlıklı olmadı; ./stack logs $app"; return 4; }
+  run_hook "$app" app_bootstrap 2>&1 | mask
+  rc=${PIPESTATUS[0]}
+  if [ "$rc" -ne 0 ] && [ "$rc" -ne 99 ]; then err "$app bootstrap başarısız (kod $rc)"; return 5; fi
+  run_hook "$app" app_gate 2>&1 | mask
+  rc=${PIPESTATUS[0]}
+  case $rc in
+    0|99) ;;
+    6) err "$app güvenlik kapısı geçmedi (varsayılan kimlik/admin); yukarıdaki yönergeyi uygula"; return 6 ;;
+    *) err "$app güvenlik kapısı çalışmadı (kod $rc)"; return 5 ;;
+  esac
+  info "OK $app $STACK_URL"
+  run_hook "$app" app_up_note 2>&1 | mask
+  return 0
+}
+
+down_app() {
+  set_ctx "$1"
+  check_app_files "$1" || return 2
+  stack_compose down 2>&1 | mask
+  [ "${PIPESTATUS[0]}" -eq 0 ] || { err "$1 kapatılamadı (docker compose down)"; return 5; }
+  info "OK $1 kapalı (veri korunur)"
+}
+
+status_app() {
+  local app=$1 state=stopped
+  set_ctx "$app"
+  check_app_files "$app" || return 2
+  if [ -n "$(stack_compose ps -q 2>/dev/null)" ]; then
+    if run_hook "$app" app_health >/dev/null 2>&1; then state=healthy; else state=unhealthy; fi
+  fi
+  info "$app: $state $STACK_URL"
+  if [ "$state" != stopped ]; then
+    warn_emulation
+    run_hook "$app" app_status_extra 2>&1 | mask | sed 's/^/  /'
+  fi
+  return 0
+}
+
+backup_app() { # app_backup hook'unu çağırır; dosya/mod/tar doğrulaması burada
+  local app=$1 ts base dir f rc n=0
+  set_ctx "$app"
+  check_app_files "$app" || return 2
+  hook_defined "$app" app_backup || { err "stacks/$app/hooks.sh app_backup tanımlamıyor"; return 2; }
+  if [ -z "$(stack_compose ps -q 2>/dev/null)" ]; then
+    err "$app çalışmıyor; önce ./stack up $app"
+    return 2
+  fi
+  ts=$(date -u +%Y%m%dT%H%M%SZ)
+  base=$LOCAL/backups/$app
+  dir=$base/$ts
+  mkdir -p "$LOCAL/backups" "$base" || { err "$base oluşturulamadı"; return 5; }
+  chmod 700 "$LOCAL/backups" "$base" || { err "$base izni ayarlanamadı"; return 5; }
+  mkdir "$dir" || { err "$dir oluşturulamadı (aynı saniyede ikinci yedek?)"; return 5; }
+  chmod 700 "$dir" || { err "$dir izni ayarlanamadı"; return 5; }
+  run_hook "$app" app_backup "$dir" 2>&1 | mask
+  rc=${PIPESTATUS[0]}
+  if [ "$rc" -ne 0 ]; then
+    rm -rf "$dir"
+    err "$app yedeği başarısız (kod $rc); yarım yedek silindi"
+    return 5
+  fi
+  for f in "$dir"/*; do
+    [ -f "$f" ] || continue
+    n=$((n + 1))
+    chmod 600 "$f"
+    if [ ! -s "$f" ]; then
+      rm -rf "$dir"
+      err "$app yedeği boş dosya içeriyor (${f##*/}); yedek silindi"
+      return 5
+    fi
+    case $f in
+      *.tar)
+        if ! tar -tf "$f" >/dev/null 2>&1; then
+          rm -rf "$dir"
+          err "$app yedeği bozuk tar (${f##*/}); yedek silindi"
+          return 5
+        fi ;;
+    esac
+  done
+  if [ "$n" -lt 2 ]; then
+    rm -rf "$dir"
+    err "$app yedeği eksik (db.sql ve en az bir tar beklenir); yedek silindi"
+    return 5
+  fi
+  info "OK $app yedek ${dir#"$LOCAL"/}"
+  return 0
+}
+
+# all: her uygulamayı dener; ilk başarısızın (bookstack, penpot, plane) kodu çıkış kodudur
+run_each() { # fn app...
+  local fn=$1 app rc first=0 multi=0
+  shift
+  [ $# -gt 1 ] && multi=1
+  for app in "$@"; do
+    "$fn" "$app"
+    rc=$?
+    if [ "$rc" -ne 0 ]; then
+      [ "$multi" = 1 ] && info "FAIL $app kod $rc"
+      [ "$first" -eq 0 ] && first=$rc
+    fi
+  done
+  return "$first"
+}
+
+gen_hex() {
+  if command -v openssl >/dev/null 2>&1; then openssl rand -hex 24
+  else od -An -N24 -tx1 /dev/urandom | tr -d ' \n'; fi
+}
+gen_appkey() {
+  if command -v openssl >/dev/null 2>&1; then printf 'base64:%s' "$(openssl rand -base64 32)"
+  else printf 'base64:%s' "$(head -c 32 /dev/urandom | base64)"; fi
+}
+
+cmd_init() {
+  local had_env=0 add="" added="" f base line key val app n=0 out
+  command -v openssl >/dev/null 2>&1 || command -v od >/dev/null 2>&1 || die 2 "openssl (veya od) bulunamadı; kur ve PATH'e ekle"
+  [ -f "$TEMPLATE" ] || die 2 "local.example/.env.example yok"
+  mkdir -p "$LOCAL" 2>/dev/null || die 2 "$LOCAL oluşturulamadı"
+  chmod 700 "$LOCAL" || die 2 "$LOCAL izni ayarlanamadı"
+  mkdir -p "$LOCAL/backups" && chmod 700 "$LOCAL/backups" || die 2 "$LOCAL/backups oluşturulamadı"
+  for f in "$ROOT"/local.example/* "$ROOT"/local.example/.[!.]*; do
+    [ -f "$f" ] || continue
+    base=${f##*/}
+    [ "$base" = .env.example ] && continue
+    [ -e "$LOCAL/$base" ] || { cp "$f" "$LOCAL/$base" && chmod 600 "$LOCAL/$base"; }
+  done
+  if [ -f "$ENVFILE" ]; then
+    had_env=1
+    chmod 600 "$ENVFILE"
+    load_env "$ENVFILE"
+  elif command -v docker >/dev/null 2>&1; then
+    out=$(docker volume ls -q 2>/dev/null) || out=""
+    for app in $ALL_APPS; do
+      printf '%s\n' "$out" | grep -q "^selfhost-${app}_" &&
+        warn "selfhost-${app}_* volume'ları var ama local/.env yok: yeni secret'lar eski veriyle uyuşmaz; local/.env yedeğini geri koy"
+    done
+  fi
+  while IFS= read -r line || [ -n "$line" ]; do
+    case $line in ''|'#'*) continue ;; esac
+    key=${line%%=*}
+    val=${line#*=}
+    is_allowed_key "$key" || die 2 "$TEMPLATE: izin verilmeyen anahtar"
+    [ -z "$(getvar "ENVLINE_$key")" ] || continue
+    if [ "$val" = __GENERATE__ ]; then
+      if [ "$key" = BOOKSTACK_APP_KEY ]; then val=$(gen_appkey); else val=$(gen_hex); fi
+      [ -n "$val" ] || die 2 "$key üretilemedi"
+    fi
+    printf -v "ENVLINE_$key" '%s' "tpl"
+    add="$add$key=$val
+"
+    added="$added $key"
+    n=$((n + 1))
+  done < "$TEMPLATE"
+  if [ "$n" -eq 0 ]; then
+    info "init: local/.env güncel (değişiklik yok)"
+    return 0
+  fi
+  ENV_TMP=$(mktemp "$LOCAL/.env.tmp.XXXXXX") || die 2 "geçici dosya açılamadı"
+  chmod 600 "$ENV_TMP"
+  {
+    if [ "$had_env" = 1 ]; then
+      cat "$ENVFILE"
+      [ -n "$(tail -c1 "$ENVFILE")" ] && printf '\n'
+    fi
+    printf '%s' "$add"
+  } > "$ENV_TMP" || die 2 "$ENVFILE yazılamadı"
+  mv -f "$ENV_TMP" "$ENVFILE" || die 2 "$ENVFILE yerine konamadı"
+  ENV_TMP=""
+  info "init: $n anahtar eklendi:$added"
+  info "init: $(local_hint) mod 600; secret değerleri yazdırılmaz. BookStack admin parolası BOOKSTACK_ADMIN_PASSWORD anahtarında."
+  info "sıradaki: ./stack up"
+}
+
+prepare_runtime() { # app listesi ($@) için ortak ön koşullar
+  local app
+  need_runtime_tools
+  [ -f "$ENVFILE" ] || die 2 "$(local_hint) yok; önce ./stack init"
+  load_env "$ENVFILE"
+  validate_ports
+  for app in "$@"; do require_keys "$(app_keys "$app")"; done
+  build_mask
+}
+
+parse_app_arg() { # komut $@ -> APPS
+  local cmd=$1 a
+  shift
+  [ $# -le 1 ] || die 1 "$cmd en fazla bir uygulama alır"
+  a=${1:-all}
+  case $a in
+    all) APPS=$ALL_APPS ;;
+    bookstack|penpot|plane) APPS=$a ;;
+    *) die 1 "bilinmeyen uygulama '$(safe "$a")' (bookstack|penpot|plane|all)" ;;
+  esac
+}
+
+main() {
+  local cmd=${1:-} svc="" follow=0 a
+  [ -n "$cmd" ] || die 1 "komut gerekli: init|up|down|status|logs|backup"
+  shift
+  case $cmd in
+    help|-h|--help) sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//'; return 0 ;;
+    init)
+      [ $# -eq 0 ] || die 1 "init argüman almaz"
+      cmd_init ;;
+    up|down|status|backup)
+      parse_app_arg "$cmd" "$@"
+      if [ "$cmd" = down ]; then
+        need_cmd docker
+        docker info >/dev/null 2>&1 || die 2 "Docker erişilemiyor; Docker'ı başlat"
+        [ -f "$ENVFILE" ] || die 2 "$(local_hint) yok; önce ./stack init"
+        load_env "$ENVFILE"; validate_ports
+        for a in $APPS; do require_keys "$(app_keys "$a")"; done
+        build_mask
+      else
+        # shellcheck disable=SC2086
+        prepare_runtime $APPS
+      fi
+      # shellcheck disable=SC2086
+      case $cmd in
+        up) run_each up_app $APPS ;;
+        down) run_each down_app $APPS ;;
+        status) run_each status_app $APPS ;;
+        backup) run_each backup_app $APPS ;;
+      esac ;;
+    logs)
+      [ $# -ge 1 ] || die 1 "logs bir uygulama ister: ./stack logs <bookstack|penpot|plane> [servis] [-f]"
+      case $1 in
+        bookstack|penpot|plane) a=$1 ;;
+        all) die 1 "logs tek uygulama ister (all olmaz)" ;;
+        *) die 1 "bilinmeyen uygulama '$(safe "$1")'" ;;
+      esac
+      shift
+      for svc_arg in "$@"; do
+        case $svc_arg in
+          -f) follow=1 ;;
+          -*) die 1 "bilinmeyen seçenek '$(safe "$svc_arg")'" ;;
+          *[!a-z0-9_-]*|'') die 1 "geçersiz servis adı '$(safe "$svc_arg")'" ;;
+          *) [ -z "$svc" ] || die 1 "logs en fazla bir servis alır"; svc=$svc_arg ;;
+        esac
+      done
+      prepare_runtime "$a"
+      set_ctx "$a"
+      check_app_files "$a" || return 2
+      if [ "$follow" = 1 ]; then
+        stack_compose logs --no-color --tail 200 -f ${svc:+"$svc"} 2>&1 | mask
+      else
+        stack_compose logs --no-color --tail 200 ${svc:+"$svc"} 2>&1 | mask
+      fi
+      return "${PIPESTATUS[0]}" ;;
+    *) die 1 "bilinmeyen komut '$(safe "$cmd")' (init|up|down|status|logs|backup)" ;;
+  esac
+}
+
+main "$@"
+exit $?

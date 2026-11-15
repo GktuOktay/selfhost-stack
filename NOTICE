@@ -1,0 +1,48 @@
+selfhost-stack
+Copyright (c) 2026 Göktuğ Oktay. Bu deponun kendi dosyaları MIT lisanslıdır (LICENSE).
+
+Bu depo aşağıdaki üçüncü taraf bileşenlere başvurur ya da onlardan kopyalanmış dosya içerir.
+Her bileşen kendi lisansını korur.
+
+1. Penpot
+   Kaynak: https://github.com/penpot/penpot
+   Etiket: 2.18.6
+   Lisans: MPL-2.0 (https://github.com/penpot/penpot/blob/2.18.6/LICENSE)
+   Depodaki dosya: stacks/penpot/compose.yaml
+     Kaynak dosya: https://github.com/penpot/penpot/blob/2.18.6/docker/images/docker-compose.yaml
+     Değiştirilmiş kopya. Değişiklikler dosya başlığında: penpot-mailpit, penpot-mcp ve
+     penpot-admin-console servisleri ve traefik örneği çıkarıldı; image etiketleri tam patch
+     sürümüne sabitlendi; secret ve port local/.env'den gelir; giriş portu 127.0.0.1'e bağlandı;
+     telemetri, SMTP, MCP ve kayıt kapatıldı.
+   Image'lar: penpotapp/frontend:2.18.6, penpotapp/backend:2.18.6, penpotapp/exporter:2.18.6,
+     postgres:15.20, valkey/valkey:8.1.11
+
+2. Plane
+   Kaynak: https://github.com/makeplane/plane
+   Etiket: v1.4.3
+   Lisans: AGPL-3.0
+   Depodaki dosya: stacks/plane/compose.yaml
+     Kaynak dosya: https://github.com/makeplane/plane/releases/download/v1.4.3/docker-compose.yml
+     Değiştirilmiş kopya. Değişiklikler dosya başlığında: proxy yalnız 127.0.0.1:${PLANE_PORT}
+     üzerinden yayınlanır (443, host modu ve sertifika ayarları çıkarıldı); upstream
+     variables.env değerleri compose içine gömüldü; secret'lar local/.env'den gelir;
+     APP_RELEASE sabitlemesi kaldırıldı; ENABLE_SIGNUP=0.
+   Image'lar: makeplane/plane-{frontend,space,admin,live,backend,proxy}:v1.4.3,
+     postgres:15.7-alpine, valkey/valkey:7.2.11-alpine, rabbitmq:3.13.6-management-alpine
+   Nesne depolama image'ı:
+     docker.io/pgsty/silo:RELEASE.2026-09-16T00-00-00Z
+       @sha256:635197cb9f36d01bee221d34d1c7d7960f6a95c48b0b6c01d99cd13bdae51a46
+     Kaynak: https://github.com/pgsty/silo ("MinIO fork maintained by PGSTY")
+     Lisans: AGPL-3.0 (GitHub API'ye göre; compose başlığında kayıtlı)
+
+3. BookStack
+   Kaynak: https://github.com/BookStackApp/BookStack (lisans: MIT)
+   Image: lscr.io/linuxserver/bookstack:v26.09.2-ls295
+     @sha256:33f61a72d9aaa021f7e687987b9fcb992673d9ca3fc08f63f5ddaddf59e94efc
+     Yayıncı: linuxserver.io, https://github.com/linuxserver/docker-bookstack
+     Image lisansı: GPL-3.0 (image betikleri MIT; compose başlığına göre)
+   Veritabanı image'ı: mariadb:11.4.13 (Docker Official Image; lisans GPL-2.0)
+   Depodaki dosya: stacks/bookstack/compose.yaml elle yazılmıştır, upstream kopyası değildir.
+
+Uyarı: Bu depo yukarıdaki image'ları dağıtmaz, yalnızca çalışma anında Docker kayıt
+defterinden çeker. Image'ların lisansı ilgili yayıncıya aittir.

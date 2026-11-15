@@ -4,19 +4,19 @@ Statüler: adopt / trial / assess / retire. Kayıt dışı teknoloji "assess" ol
 
 | Technology | Status | Rationale | Date | ADR |
 |---|---|---|---|---|
-| Docker Engine + Compose v2 (≥ 2.24.4, `!override`/`!reset`) | adopt | Tercih edilen stack'in parçası (local Docker). Yerel `-f` merge mekanizması katman modelini ek araçsız taşıyor | 2026-11-09 | ADR-0001 (gerekli, yazılmadı) |
+| Docker Engine + Compose v2 (≥ 2.24.4 yalnız r2 overlay modeli için; sade spec 0001'de `!override` yok, tek `compose.yaml` + `--env-file`) | adopt | Tercih edilen stack'in parçası (local Docker). Sade spec: proje adı `selfhost-<app>` ve volume adları veri kimliği, ADR-0001 kapsamı bu iki konuya daralır (gerekli, yazılmadı) | 2026-11-15 | ADR-0001 (gerekli, yazılmadı) |
 | bash 3.2 uyumlu CLI (`stack`) | trial | Ek runtime yok. Koşul: `/bin/bash` 3.2 test kapısı, `COMPOSE_*` temizliği. Yeniden değerlendirme tetikleyicisi görüşte A-13 | 2026-11-09 | ADR-0005 (önerilir) |
 | shellcheck (geliştirme kapısı G-1) | trial | Bash hata disiplini için statik kapı. bash 3.2 özelliklerini ayırt etmez, test kapısıyla birlikte kullanılır | 2026-11-09 | - |
-| jq (çözümlenmiş compose okuma) | assess | Spec'te yok, guard'lar için gerekli görünüyor. Ön koşul mu container mı kararı bekliyor (A-07) | 2026-11-09 | - |
-| BookStack via `lscr.io/linuxserver/bookstack` | assess | Resmi image yok varsayımı (F-1) doğrulanmadı. Bakım ve güvenlik geçmişi eksik | 2026-11-09 | - |
-| MariaDB (Docker Official Image) | assess | BookStack DB. LTS seçimi ve major upgrade yolu tanımsız (A-02) | 2026-11-09 | ADR-0002 (gerekli) |
-| Penpot (frontend, backend, exporter) | assess | CEO'nun seçtiği uygulama, MPL-2.0. Upstream compose vendored | 2026-11-09 | ADR-0001 |
-| Plane Community Edition | assess | CEO'nun seçtiği uygulama, AGPL-3.0 (dahili kullanım). ~12 container | 2026-11-09 | ADR-0001 |
-| PostgreSQL (Penpot, Plane) | assess | Upstream gereksinimi. Major değişimi `up` ile yapılmaz (A-02) | 2026-11-09 | ADR-0002 (gerekli) |
-| Valkey / Redis (Penpot, Plane) | assess | Upstream gereksinimi, geçici veri, yedek dışı | 2026-11-09 | - |
-| RabbitMQ (Plane) | assess | Upstream gereksinimi, yedek dışı | 2026-11-09 | - |
-| MinIO (Plane object storage) | assess | Risk: topluluk dağıtımı ve bakımı 2025'te kısıtlandı (doğrulanmadı). Retire adayı, çıkış tetikleyicisi ADR'de yazılmalı (A-11) | 2026-11-09 | ADR-0004 (gerekli) |
-| alpine (yedek tar yardımcı image'ı) | assess | Yalnızca read-only tar. Alternatif: yeni image eklememek | 2026-11-09 | ADR-0003 (gerekli, yedek formatı) |
+| jq (çözümlenmiş compose okuma) | assess | Sade spec 0001'de yok (grep/cut). AC-5'in servis başına `ports` denetimi grep ile kırılgan; jq gerekirse board'a yeniden gelir | 2026-11-15 | - |
+| BookStack via `lscr.io/linuxserver/bookstack` (`v26.09.2-ls<N>`) | trial | Scout F-1/F-2: resmi image yok, multi-arch. Koşul: gerçek tag T-2'de doğrulanır, OSV/GHSA appsec'te. Çıkış maliyeti düşük | 2026-11-15 | - |
+| MariaDB (Docker Official Image, `11.4.<patch>`) | trial | BookStack DB. Tam patch tag şart (AC-1 regex). Major yükseltme `up` ile korunmaz (sade: upgrade non-goal), README uyarısı | 2026-11-15 | - |
+| Penpot 2.18.6 (frontend, backend, exporter) | trial | CEO'nun seçtiği uygulama, MPL-2.0. Upstream compose kopyası; mailpit/mcp çıkarılır (kriter yok). arm64: tüm image'lar manifest'te var, canlı çalıştırma T-8'de (docs/reviews/t8-live-verification-0001.md) | 2026-11-15 | - |
+| Plane Community Edition v1.4.3 | trial | CEO'nun seçtiği uygulama, AGPL-3.0 (dahili kullanım). ~12 container. arm64 manifest'leri doğrulandı, canlı çalıştırma T-8'de | 2026-11-15 | - |
+| PostgreSQL (Penpot `15.x`, Plane `15.7-alpine`) | trial | Upstream gereksinimi. Tam patch tag. Major bump manuel dump/restore | 2026-11-15 | - |
+| Valkey (Penpot `8.1.x`, Plane `7.2.11-alpine`) | trial | Upstream gereksinimi, geçici veri, yedek dışı | 2026-11-15 | - |
+| RabbitMQ `3.13.6-management-alpine` (Plane) | trial | Upstream gereksinimi, yedek dışı. 3.13 hattının topluluk desteği bitmiş olabilir (doğrulanmadı); Plane'in pin'i izlenir | 2026-11-15 | - |
+| `pgsty/silo:RELEASE.2026-09-16T00-00-00Z` (Plane object storage, MinIO fork'u) | assess | Üçüncü taraf fork; bakım, lisans, güvenlik doğrulanmadı. Yalnız loopback + tam tag + yalnız Plane. ASK CEO (risk kabulü). Çıkış tetikleyicisi ADR-0004'te: silo CVE, Plane depolamayı değiştirir, LAN erişimi açılır | 2026-11-15 | ADR-0004 (gerekli, yazılmadı) |
+| alpine (yedek tar yardımcı image'ı, `3.<minor>`) | assess | CONDITIONAL: alternatif "yeni image yok" (zaten çekilmiş app image'larında `--entrypoint tar`) T-5'te denenir; tüm volume'lar kapsanırsa alpine düşer. Kalırsa tam patch tag | 2026-11-15 | - |
 | CPython stdlib via `python:3.14.<patch>-alpine3.24@sha256` (dashfeed sidecar, spec 0002 Faz 2a) | assess | Plane token'ını BookStack'ten ayırmak için (S2). pip yok. Rationale tablosu tam, güvenlik kanıtı eksik (D-20). Board tur 3: minor 3.14 APPROVE (PEP 745; 3.13 yalnız güvenlik aşamasında, PEP 719). 3.15 alternatif satırı istendi (K3-5). Trial'a geçiş: T-0a2 temiz (K2-4) + Faz 2a imzası. T-0a2 tamamlanmazsa REJECT | 2026-11-09 | - |
 | Plane public API v1 (salt okuma, `X-API-Key`, `work-items`) | assess | Dashboard verisi. Docs verified (D-12, D-13): 60/dk/anahtar, self-host'ta `API_KEY_RATE_LIMIT` ile ayarlanabilir, sunucu tarafı filtre yok (D-13c), anahtar sahibinin yetkisiyle çalışır. Pinli v1.4.3 davranışı T-0c + CB-28. Uyum `PLANE_COMPAT` anahtar kümeleri | 2026-11-09 | - |
 | BookStack visual theme override (B-copy: birebir kopya + tam satır `@include`, sha256 + diff) | trial | Ana sayfa ve raf dashboard'u. Board tur 2: APPROVE. Sapma CB-8 ile mekanik yakalanır (ham bayt diff, arm64 + amd64). Veri erişimi `ACCESS_ALLOWLIST` ile (K2-1 karşılandı, tur 3). Tema kilidi C-14: pin ≠ `UPSTREAM` ya da `VIEW` yoksa tema kapanır (dar tanım, K3-1). Hash etiketi yok, yayılma opcache ile (D-9), opcache ayarı bump'ta izlenir (K3-2). Kullanıma giriş: Faz 1 imzası + ADR-0007 r3 kabulü (K2-2) | 2026-11-09 | ADR-0007 (Proposed) |

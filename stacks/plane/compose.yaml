@@ -1,0 +1,290 @@
+# Upstream: https://github.com/makeplane/plane/releases/download/v1.4.3/docker-compose.yml (tag v1.4.3)
+# License: AGPL-3.0 (makeplane/plane, SPDX AGPL-3.0 per GitHub API; the upstream asset has no
+#   header of its own). This is a modified copy; see NOTICE at the repo root.
+# Changes vs upstream (selfhost-stack, spec 0001 T-4):
+#   - proxy: only 127.0.0.1:${PLANE_PORT} -> 80 is published (443, host mode and cert settings removed);
+#     all other services sit on the `internal: true` network only and publish nothing.
+#   - upstream variables.env is embedded below (non-secret values only; no plane.env in git).
+#     Secrets come from local/.env via ${VAR:?} (PLANE_*), never defaults like plane/access-key.
+#   - APP_RELEASE pin removed: every image has a fixed tag; silo also by digest.
+#   - ENABLE_SIGNUP=0 (see hooks.sh header for what that does and does not do).
+# Image pins (verified 2026-11-15 with docker manifest inspect / buildx imagetools inspect):
+#   makeplane/plane-{frontend,space,admin,live,backend,proxy}:v1.4.3  amd64+arm64
+#   postgres:15.7-alpine, valkey/valkey:7.2.11-alpine, rabbitmq:3.13.6-management-alpine  amd64+arm64
+#   docker.io/pgsty/silo:RELEASE.2026-09-16T00-00-00Z
+#     publisher: Docker Hub user pgsty (GitHub pgsty/silo, "MinIO fork maintained by PGSTY"),
+#     license: AGPL-3.0 (GitHub API), index digest sha256:635197cb9f36d01bee221d34d1c7d7960f6a95c48b0b6c01d99cd13bdae51a46
+#     (amd64 + arm64 manifests). Newer releases exist (e.g. RELEASE.2026-11-12T00-00-00Z); we keep
+#     the tag upstream Plane v1.4.3 ships. Risk acceptance: docs/architecture/tasarim/ADR-0004-silo-object-storage.md
+
+x-db-env: &db-env
+  PGHOST: plane-db
+  PGDATABASE: plane
+  POSTGRES_USER: plane
+  POSTGRES_PASSWORD: ${PLANE_DB_PASSWORD:?PLANE_DB_PASSWORD gerekli}
+  POSTGRES_DB: plane
+  POSTGRES_PORT: "5432"
+  PGDATA: /var/lib/postgresql/data
+
+x-redis-env: &redis-env
+  REDIS_HOST: plane-redis
+  REDIS_PORT: "6379"
+  REDIS_URL: redis://plane-redis:6379/
+
+x-minio-env: &minio-env
+  MINIO_ROOT_USER: ${PLANE_STORAGE_ACCESS_KEY:?PLANE_STORAGE_ACCESS_KEY gerekli}
+  MINIO_ROOT_PASSWORD: ${PLANE_STORAGE_SECRET_KEY:?PLANE_STORAGE_SECRET_KEY gerekli}
+
+x-aws-s3-env: &aws-s3-env
+  AWS_REGION: ""
+  AWS_ACCESS_KEY_ID: ${PLANE_STORAGE_ACCESS_KEY:?PLANE_STORAGE_ACCESS_KEY gerekli}
+  AWS_SECRET_ACCESS_KEY: ${PLANE_STORAGE_SECRET_KEY:?PLANE_STORAGE_SECRET_KEY gerekli}
+  AWS_S3_ENDPOINT_URL: http://plane-minio:9000
+  AWS_S3_BUCKET_NAME: uploads
+
+x-proxy-env: &proxy-env
+  APP_DOMAIN: 127.0.0.1
+  FILE_SIZE_LIMIT: "5242880"
+  # CERT_ACME_CA must stay unset: empty-but-set breaks Caddyfile acme_ca (default applies when unset)
+  CERT_EMAIL: ""
+  CERT_ACME_DNS: ""
+  LISTEN_HTTP_PORT: "80"
+  LISTEN_HTTPS_PORT: "443"
+  BUCKET_NAME: uploads
+  SITE_ADDRESS: ":80"
+
+x-mq-env: &mq-env
+  RABBITMQ_HOST: plane-mq
+  RABBITMQ_PORT: "5672"
+  RABBITMQ_DEFAULT_USER: plane
+  RABBITMQ_DEFAULT_PASS: ${PLANE_RABBITMQ_PASSWORD:?PLANE_RABBITMQ_PASSWORD gerekli}
+  RABBITMQ_DEFAULT_VHOST: plane
+  RABBITMQ_VHOST: plane
+
+x-live-env: &live-env
+  API_BASE_URL: http://api:8000
+  LIVE_SERVER_SECRET_KEY: ${PLANE_LIVE_SECRET_KEY:?PLANE_LIVE_SECRET_KEY gerekli}
+
+x-app-env: &app-env
+  WEB_URL: http://127.0.0.1:${PLANE_PORT:?PLANE_PORT gerekli}
+  DEBUG: "0"
+  CORS_ALLOWED_ORIGINS: http://127.0.0.1:${PLANE_PORT:?PLANE_PORT gerekli}
+  GUNICORN_WORKERS: "1"
+  USE_MINIO: "1"
+  DATABASE_URL: postgresql://plane:${PLANE_DB_PASSWORD:?PLANE_DB_PASSWORD gerekli}@plane-db/plane
+  SECRET_KEY: ${PLANE_SECRET_KEY:?PLANE_SECRET_KEY gerekli}
+  AMQP_URL: amqp://plane:${PLANE_RABBITMQ_PASSWORD:?PLANE_RABBITMQ_PASSWORD gerekli}@plane-mq:5672/plane
+  API_KEY_RATE_LIMIT: 60/minute
+  MINIO_ENDPOINT_SSL: "0"
+  LIVE_SERVER_SECRET_KEY: ${PLANE_LIVE_SECRET_KEY:?PLANE_LIVE_SECRET_KEY gerekli}
+  WEBHOOK_ALLOWED_IPS: ""
+  WEBHOOK_ALLOWED_HOSTS: ""
+  ENABLE_SIGNUP: "0"
+
+services:
+  web:
+    image: makeplane/plane-frontend:v1.4.3
+    networks: [internal]
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: any
+    depends_on:
+      - api
+      - worker
+
+  space:
+    image: makeplane/plane-space:v1.4.3
+    networks: [internal]
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: any
+    depends_on:
+      - api
+      - worker
+      - web
+
+  admin:
+    image: makeplane/plane-admin:v1.4.3
+    networks: [internal]
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: any
+    depends_on:
+      - api
+      - web
+
+  live:
+    image: makeplane/plane-live:v1.4.3
+    networks: [internal]
+    environment:
+      <<: [*live-env, *redis-env]
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: any
+    depends_on:
+      - api
+      - web
+
+  api:
+    image: makeplane/plane-backend:v1.4.3
+    command: ./bin/docker-entrypoint-api.sh
+    networks: [internal]
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: any
+    volumes:
+      - logs_api:/code/plane/logs
+    environment:
+      <<: [*app-env, *db-env, *redis-env, *minio-env, *aws-s3-env, *proxy-env]
+    depends_on:
+      - plane-db
+      - plane-redis
+      - plane-mq
+
+  worker:
+    image: makeplane/plane-backend:v1.4.3
+    command: ./bin/docker-entrypoint-worker.sh
+    networks: [internal]
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: any
+    volumes:
+      - logs_worker:/code/plane/logs
+    environment:
+      <<: [*app-env, *db-env, *redis-env, *minio-env, *aws-s3-env, *proxy-env]
+    depends_on:
+      - api
+      - plane-db
+      - plane-redis
+      - plane-mq
+
+  beat-worker:
+    image: makeplane/plane-backend:v1.4.3
+    command: ./bin/docker-entrypoint-beat.sh
+    networks: [internal]
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: any
+    volumes:
+      - logs_beat-worker:/code/plane/logs
+    environment:
+      <<: [*app-env, *db-env, *redis-env, *minio-env, *aws-s3-env, *proxy-env]
+    depends_on:
+      - api
+      - plane-db
+      - plane-redis
+      - plane-mq
+
+  migrator:
+    image: makeplane/plane-backend:v1.4.3
+    command: ./bin/docker-entrypoint-migrator.sh
+    networks: [internal]
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+    volumes:
+      - logs_migrator:/code/plane/logs
+    environment:
+      <<: [*app-env, *db-env, *redis-env, *minio-env, *aws-s3-env, *proxy-env]
+    depends_on:
+      - plane-db
+      - plane-redis
+
+  plane-db:
+    image: postgres:15.7-alpine
+    command: postgres -c 'max_connections=1000'
+    networks: [internal]
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: any
+    environment:
+      <<: *db-env
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  plane-redis:
+    image: valkey/valkey:7.2.11-alpine
+    networks: [internal]
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: any
+    volumes:
+      - redisdata:/data
+
+  plane-mq:
+    image: rabbitmq:3.13.6-management-alpine
+    networks: [internal]
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: any
+    environment:
+      <<: *mq-env
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+
+  plane-minio:
+    image: docker.io/pgsty/silo:RELEASE.2026-09-16T00-00-00Z@sha256:635197cb9f36d01bee221d34d1c7d7960f6a95c48b0b6c01d99cd13bdae51a46
+    command: server /export --console-address ":9090"
+    networks: [internal]
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: any
+    environment:
+      <<: *minio-env
+    volumes:
+      - uploads:/export
+
+  # Only entry point. An `internal: true` network has no host port publishing, so the proxy is
+  # also on `edge` (a normal bridge) solely to carry the loopback port mapping.
+  proxy:
+    image: makeplane/plane-proxy:v1.4.3
+    networks: [internal, edge]
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: any
+    environment:
+      <<: *proxy-env
+    ports:
+      - target: 80
+        published: ${PLANE_PORT:?PLANE_PORT gerekli}
+        host_ip: 127.0.0.1
+        protocol: tcp
+    volumes:
+      - proxy_config:/config
+      - proxy_data:/data
+    depends_on:
+      - web
+      - api
+      - space
+      - admin
+      - live
+
+networks:
+  internal:
+    internal: true
+  edge: {}
+
+volumes:
+  pgdata:
+  redisdata:
+  uploads:
+  logs_api:
+  logs_worker:
+  logs_beat-worker:
+  logs_migrator:
+  rabbitmq_data:
+  proxy_config:
+  proxy_data:

@@ -1,0 +1,80 @@
+# stacks/bookstack/compose.yaml (selfhost-stack, spec 0001 rev 1, T-2)
+# Elle yazıldı (upstream kopyası değil). Proje: selfhost-bookstack; volume'lar selfhost-bookstack_{config,db}.
+#
+# Image kaynakları (2026-11-15'te `docker buildx imagetools inspect` ile doğrulandı):
+#   bookstack: yayıncı linuxserver.io (topluluk image'ı), lscr.io/linuxserver/bookstack
+#              tag v26.09.2-ls295, digest sha256:33f61a72d9aaa021f7e687987b9fcb992673d9ca3fc08f63f5ddaddf59e94efc
+#              (index digest; manifestler linux/amd64 ve linux/arm64 içerir). Digest,
+#              theme/selfhost-dashboard/UPSTREAM içindeki BOOKSTACK_IMAGE ile byte düzeyinde aynıdır
+#              (tema bu sürümün view'larına kilitli). Lisans: GPL-3.0 (image betikleri MIT).
+#   db:        yayıncı Docker Official Images, mariadb:11.4.13 (GPL-2.0), linux/amd64 + linux/arm64/v8.
+#              Tag-only pin (digest yok; spec §5).
+# Ağ: bookstack hem `edge` (yayın için) hem `internal` ağındadır; db yalnız `internal` (internal: true).
+
+name: selfhost-bookstack
+
+services:
+  bookstack:
+    image: lscr.io/linuxserver/bookstack:v26.09.2-ls295@sha256:33f61a72d9aaa021f7e687987b9fcb992673d9ca3fc08f63f5ddaddf59e94efc
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PUID: "1000"
+      PGID: "1000"
+      TZ: Etc/UTC
+      APP_URL: http://127.0.0.1:${BOOKSTACK_PORT:?BOOKSTACK_PORT eksik}
+      APP_KEY: ${BOOKSTACK_APP_KEY:?BOOKSTACK_APP_KEY eksik}
+      APP_THEME: selfhost-dashboard
+      DB_HOST: db
+      DB_PORT: "3306"
+      DB_DATABASE: bookstack
+      DB_USERNAME: bookstack
+      DB_PASSWORD: ${BOOKSTACK_DB_PASSWORD:?BOOKSTACK_DB_PASSWORD eksik}
+      # hooks.sh app_bootstrap bunları `exec` içinde okur (parola ARGV'ye girmez).
+      BOOKSTACK_ADMIN_EMAIL: ${BOOKSTACK_ADMIN_EMAIL:?BOOKSTACK_ADMIN_EMAIL eksik}
+      BOOKSTACK_ADMIN_PASSWORD: ${BOOKSTACK_ADMIN_PASSWORD:?BOOKSTACK_ADMIN_PASSWORD eksik}
+    ports:
+      - target: 80
+        published: "${BOOKSTACK_PORT:?BOOKSTACK_PORT eksik}"
+        host_ip: 127.0.0.1
+        protocol: tcp
+    volumes:
+      - config:/config
+      - type: bind
+        source: ./theme/selfhost-dashboard
+        target: /config/www/themes/selfhost-dashboard
+        read_only: true
+    networks:
+      - edge
+      - internal
+
+  db:
+    image: mariadb:11.4.13
+    restart: unless-stopped
+    environment:
+      TZ: Etc/UTC
+      MARIADB_ROOT_PASSWORD: ${BOOKSTACK_DB_ROOT_PASSWORD:?BOOKSTACK_DB_ROOT_PASSWORD eksik}
+      MARIADB_DATABASE: bookstack
+      MARIADB_USER: bookstack
+      MARIADB_PASSWORD: ${BOOKSTACK_DB_PASSWORD:?BOOKSTACK_DB_PASSWORD eksik}
+    volumes:
+      - db:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    networks:
+      - internal
+
+networks:
+  edge: {}
+  internal:
+    internal: true
+
+volumes:
+  config: {}
+  db: {}
