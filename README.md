@@ -1,16 +1,25 @@
 # selfhost-stack
 
-Kendi makinelerinde çalışan BookStack, Penpot ve Plane kurulumlarının tek merkezi. Depo araçları ve belgeleri taşır. Veri, parola ve token taşımaz.
+BookStack, Penpot ve Plane'i kendi makinende çalıştırmak için tek merkez. Depo araçları ve belgeleri taşır. Veri, parola ve token taşımaz.
+
+Şu an çalışan parça: BookStack ana sayfasını dört bölümlü bir panele çeviren [`dashboard/`](dashboard/README.md) (Seni bekliyor, Devam eden, Son değişiklikler, Projeler).
+
+Tanıtım sayfası (3D, animasyonlu): [`site/index.html`](site/index.html). Tarayıcıda aç.
 
 ## Şu an depoda ne var
 
 | Klasör | İçerik | Durum |
 |---|---|---|
-| `dashboard/` | BookStack ana sayfa paneli (Seni bekliyor, Devam eden, Son değişiklikler, Projeler) | Çalışıyor |
+| `dashboard/` | BookStack ana sayfa paneli | Çalışıyor |
+| `site/` | Tanıtım sayfası (tek HTML dosyası) | Hazır |
 | `docs/` | Spec 0001 (üç uygulamanın ortak kurulumu), spec 0002 (panel), incelemeler, mimari notlar | Belge |
 | `stacks/bookstack/theme/`, `tests/` | BookStack theme dilimi ve statik testleri | Kullanılmıyor, ileride için duruyor |
 
-Henüz yok: BookStack, Penpot ve Plane'in Docker Compose kurulumu ve `./stack` komutu. Spec 0001 bunu tarif ediyor ama kodlanmadı. Bu üç uygulamayı başka makinede kurmak için şimdilik kendi kurulumlarını (her birinin resmi Docker kurulum belgesi) elle yapman gerekir.
+Henüz yok: BookStack, Penpot ve Plane'in Docker Compose kurulumu ve `./stack` komutu. Spec 0001 bunu tarif ediyor ama kodlanmadı. Bu üç uygulamayı başka makinede kurmak için şimdilik her birinin resmi Docker kurulum belgesini elle uygulaman gerekir.
+
+## Depo neden özeldi, neden açıldı
+
+Kişisel bir kurulum olarak başladı ve GitHub'da varsayılan olarak özel açıldı. Özel kalması için bir güvenlik nedeni yoktu. Açmadan önce takip edilen dosyalarda parola, token, anahtar ve e-posta arandı, bulunmadı. `docs/` altındaki belgeler iç çalışma notlarıdır (inceleme turları, plan, spec taslakları); yerel dosya yolları içerir ve olduğu gibi bırakıldı.
 
 ## Gereksinimler
 
@@ -18,7 +27,7 @@ Henüz yok: BookStack, Penpot ve Plane'in Docker Compose kurulumu ve `./stack` k
 - BookStack, Penpot ve Plane'in çalışır durumda olması
 - BookStack'te yönetici hesabı
 
-## Kurulum: başka bir bilgisayara paneli taşımak
+## Kurulum: paneli kendi BookStack'ine taşımak
 
 1. Depoyu indir:
 
@@ -48,5 +57,9 @@ Ayrıntı ve geri alma adımları: [`dashboard/README.md`](dashboard/README.md).
 
 ## Güvenlik notları
 
-- Depo özeldir. Parola, token ve `.env` dosyalarını depoya ekleme. `.gitignore` bunları dışarıda tutar.
+- Parola, token ve `.env` dosyalarını depoya ekleme. `.gitignore` bunları dışarıda tutar.
 - Panel tarayıcıda, açık oturumun yetkisiyle BookStack API'sini okur. Ayrı bir token kullanmaz.
+
+## Lisans
+
+Henüz seçilmedi. Lisans dosyası eklenene kadar kodu yeniden kullanma hakkı verilmiş sayılmaz.
