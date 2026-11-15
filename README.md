@@ -4,7 +4,7 @@ BookStack, Penpot ve Plane'i kendi makinende çalıştırmak için tek merkez. D
 
 `./stack` komutu üç uygulamayı Docker Compose ile kurar, yalnızca `127.0.0.1` üzerinde yayınlar ve parolaları makinede rastgele üretir. BookStack ana sayfasını dört bölümlü bir panele çeviren [`dashboard/`](dashboard/README.md) (Seni bekliyor, Devam eden, Son değişiklikler, Projeler) ayrıca çalışır.
 
-Tanıtım sayfası (3D, animasyonlu): [`site/index.html`](site/index.html). Tarayıcıda aç.
+Tanıtım sayfası (3D, animasyonlu): [canlı sayfa](https://claude.ai/artifact/G4a67Rya9juRjQbGeiv1Hq) ya da [`site/index.html`](site/index.html).
 
 ## İçerik
 
