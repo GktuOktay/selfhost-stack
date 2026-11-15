@@ -88,6 +88,86 @@ dt{font:500 12px var(--mono);letter-spacing:.06em;text-transform:uppercase;color
 dd{margin:0;min-width:0;overflow-wrap:anywhere}
 footer{padding-block:64px 56px;color:var(--muted);font:13px var(--mono)}
 
+
+.sub{max-width:68ch;color:var(--muted);margin:0 0 24px}
+.flow{margin:0;background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:16px;overflow-x:auto}
+.flow svg{display:block;width:100%;min-width:560px;height:auto}
+.wire path{fill:none;stroke:var(--muted);stroke-width:1.6;stroke-dasharray:5 5;animation:dash 1.2s linear infinite}
+@keyframes dash{to{stroke-dashoffset:-20}}
+.viz{height:128px;border-radius:12px;background:var(--bg);border:1px solid var(--line);margin-bottom:16px;padding:10px;overflow:hidden}
+.viz-book .crumb{font:11px var(--mono);color:var(--muted);margin-bottom:8px}
+.viz-book .row{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;background:var(--surface);margin-bottom:5px;font-size:13px}
+.viz-book .row i{width:6px;height:16px;border-radius:2px;background:var(--blue)}
+.viz-book .row b{flex:1;font-weight:500}
+.chip{font:500 10px var(--mono);font-style:normal;padding:2px 8px;border-radius:99px;border:1px solid var(--warn);color:var(--warn)}
+.chip.ok{border-color:var(--good);color:var(--good)}
+.viz-pen{display:grid;place-items:center}.viz-pen svg{width:100%;height:100%}
+.viz-pen .s1{animation:fl 4s ease-in-out infinite}.viz-pen .s2{animation:fl 4s ease-in-out -1.3s infinite}.viz-pen .s3{animation:fl 4s ease-in-out -2.6s infinite}
+@keyframes fl{50%{transform:translateY(-4px)}}
+.viz-kan{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.viz-kan .col{background:var(--surface);border-radius:8px;padding:6px;display:flex;flex-direction:column;gap:5px}
+.viz-kan u{text-decoration:none;font:10px var(--mono);color:var(--muted)}
+.viz-kan span{height:16px;border-radius:5px;background:var(--violet);opacity:.75}
+.viz-kan .mv{background:var(--pink);animation:mv 3s ease-in-out infinite}
+@keyframes mv{50%{transform:translateX(8px)}}
+.viz-panel{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.viz-panel .pn{background:var(--surface);border-radius:8px;padding:8px;display:flex;flex-direction:column;justify-content:space-between;font-size:11px}
+.viz-panel em{font:800 22px var(--display);font-style:normal;color:var(--pink)}
+.scen{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:18px}
+.sc{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:22px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.sc h3{font-size:20px;margin-bottom:4px}
+.msg{padding:10px 14px;border-radius:14px;font-size:14px;line-height:1.5;max-width:92%}
+.msg.me{align-self:flex-end;background:linear-gradient(135deg,var(--blue),var(--violet));color:#fff;border-bottom-right-radius:4px}
+.msg.ai{align-self:flex-start;background:var(--bg);border:1px solid var(--line);border-bottom-left-radius:4px}
+.msg.ask{border-color:var(--amber)}
+
+.feat{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:18px}
+.fc{background:var(--surface);border:1px solid var(--line);border-top-width:4px;border-radius:16px;padding:22px;min-width:0}
+.fc.b{border-top-color:var(--blue)}.fc.m{border-top-color:var(--mint)}.fc.v{border-top-color:var(--violet)}
+.fc h3{font-size:22px;margin-bottom:12px}.fc small{display:block;font:500 12px var(--mono);color:var(--muted);letter-spacing:.06em;text-transform:uppercase;margin-top:4px}
+.fc ul{margin:0;padding:0;list-style:none;display:grid;gap:10px}
+.fc li{font-size:14.5px;color:var(--muted);padding-left:16px;position:relative}
+.fc li::before{content:"";position:absolute;left:0;top:9px;width:6px;height:6px;border-radius:2px;background:var(--c)}
+.fc b{color:var(--fg);font-weight:500}
+.fc.b{--c:var(--blue)}.fc.m{--c:var(--mint)}.fc.v{--c:var(--violet)}
+a.src{text-decoration:none;color:inherit;display:block}a.src p{font:13px var(--mono);overflow-wrap:anywhere}a.src .chip{display:inline-block;margin-top:12px}
+.together{margin-top:18px;background:linear-gradient(135deg,var(--surface),var(--bg));border:1px dashed var(--violet);border-radius:16px;padding:20px 24px}
+.together h3{font-size:20px;margin-bottom:6px}.together p{margin:0;color:var(--muted);max-width:75ch}
+.scen.live .msg{display:none}
+.scen.live .msg.on{display:block;animation:pop .35s ease-out}
+@keyframes pop{from{opacity:0;transform:translateY(8px) scale(.97)}to{opacity:1;transform:none}}
+.typing{align-self:flex-start;display:none;gap:5px;padding:12px 16px;border-radius:14px;border-bottom-left-radius:4px;background:var(--bg);border:1px solid var(--line)}
+.typing.on{display:flex}
+.typing i{width:7px;height:7px;border-radius:50%;background:var(--muted);animation:bl 1s infinite}
+.typing i:nth-child(2){animation-delay:.15s}.typing i:nth-child(3){animation-delay:.3s}
+@keyframes bl{0%,80%,100%{opacity:.25}40%{opacity:1}}
+
+.fviz{background:var(--bg);border:1px solid var(--line);border-radius:12px;margin-bottom:16px;padding:6px}
+.fviz svg{display:block;width:100%;height:auto}
+.fviz svg *{transform-box:fill-box}
+.bk{transform-origin:50% 100%;animation:drop 6s ease-out infinite}
+.b2{animation-delay:.25s}.b3{animation-delay:.5s}.b4{animation-delay:.75s}
+@keyframes drop{0%{transform:translateY(-90px);opacity:0}12%{opacity:1}22%,92%{transform:none;opacity:1}100%{opacity:0}}
+.ln{transform-origin:0 50%;animation:wr 6s ease-out infinite}
+.l2{animation-delay:.5s}.l3{animation-delay:1s}.l4{animation-delay:1.5s}
+@keyframes wr{0%,10%{transform:scaleX(0)}30%,92%{transform:scaleX(1)}100%{transform:scaleX(0)}}
+.bub{transform-origin:100% 100%;animation:bub 6s ease-out infinite}
+@keyframes bub{0%,55%{transform:scale(0);opacity:0}65%,92%{transform:scale(1);opacity:1}100%{opacity:0;transform:scale(1)}}
+.cur1{animation:c1 6s ease-in-out infinite}
+.cur2{animation:c2 6s ease-in-out infinite}
+@keyframes c1{0%,100%{transform:translate(130px,90px)}35%{transform:translate(136px,66px)}70%{transform:translate(70px,60px)}}
+@keyframes c2{0%,100%{transform:translate(200px,126px)}40%{transform:translate(236px,70px)}75%{transform:translate(196px,124px)}}
+.r1{animation:r1 6s ease-in-out infinite}
+@keyframes r1{0%,100%{transform:none}35%{transform:translate(6px,-4px) scale(1.1)}70%{transform:translate(-6px,2px)}}
+.c1{animation:cc 6s ease-in-out infinite}
+@keyframes cc{0%,100%{transform:scale(1)}40%{transform:scale(1.25)}75%{transform:scale(.9)}}
+.bar{transform-origin:0 50%;animation:br 6s ease-in-out infinite}
+@keyframes br{0%,100%{transform:scaleX(1)}40%{transform:scaleX(.55)}75%{transform:scaleX(1.08)}}
+.kcard{animation:kc 6s ease-in-out infinite}
+@keyframes kc{0%,12%{transform:none}38%,55%{transform:translate(101px,50px)}80%,100%{transform:translate(202px,44px)}}
+.cyc{transform-origin:0 50%;animation:cy 6s ease-in-out infinite}
+@keyframes cy{0%{transform:scaleX(.05)}85%,100%{transform:scaleX(.82)}}
+@media (prefers-reduced-motion:reduce){.fviz svg *{animation:none!important}.bk,.ln,.bub{opacity:1}.wire path,.viz *,.pk{animation:none!important}.pk{display:none}}
 @media (prefers-reduced-motion:reduce){.grad,.dot{animation:none}.card,.btn{transition:none}}
 @media (max-width:560px){.stage{min-height:560px}.hint{display:none}}
 </style>
@@ -101,7 +181,7 @@ footer{padding-block:64px 56px;color:var(--muted);font:13px var(--mono)}
   <div class="wrap">
     <span class="tag"><i class="dot"></i> self-hosted · Docker</span>
     <h1>Selfhost <span class="grad">Stack</span></h1>
-    <p class="lead">Wiki, tasarım ve proje yönetimi aynı çatı altında. BookStack, Penpot ve Plane'i kendi makinende çalıştır. Başlangıç noktası: hepsini tek bakışta gösteren ana sayfa paneli.</p>
+    <p class="lead">Wiki, tasarım ve iş takibini yapay zekâ ajanları yürütür, sen yalnızca konuşur ve onaylarsın. BookStack, Penpot ve Plane kendi makinende çalışır.</p>
     <div class="cta">
       <a class="btn" href="https://github.com/GktuOktay/selfhost-stack" target="_blank" rel="noopener">GitHub'da aç</a>
       <a class="btn ghost" href="#kurulum">Kurulum</a>
@@ -110,14 +190,219 @@ footer{padding-block:64px 56px;color:var(--muted);font:13px var(--mono)}
 </header>
 
 <main class="wrap">
+  <section id="nasil">
+    <div class="eyebrow">Nasıl çalışır</div>
+    <h2>İşi AI yapar, sen karar verirsin</h2>
+    <p class="sub">Wiki, tasarım ve iş takibi yapay zekâ ajanlarının çalışma alanıdır. Ajanlar üç uygulamaya MCP ya da API üzerinden bağlanır; belgeyi yazar, ekranı çizer, işi açar ve günceller. İnsanla yalnızca konuşma ve onay kalır: ajan sorularını BookStack'teki Sorular sayfasına yazar, sen sayfaya yorum bırakarak cevaplarsın.</p>
+    <figure class="flow">
+      <svg viewBox="0 0 760 340" role="img" aria-label="Sen, AI ajanlar ve üç uygulama arasındaki akış">
+        <defs>
+          <marker id="ar" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--muted)"/></marker>
+        </defs>
+        <g class="wire">
+          <path d="M150 170 H300" marker-end="url(#ar)"/>
+          <path d="M300 190 H150" marker-end="url(#ar)"/>
+          <path d="M470 150 C 540 90, 560 70, 610 70" marker-end="url(#ar)"/>
+          <path d="M470 170 H610" marker-end="url(#ar)"/>
+          <path d="M470 190 C 540 250, 560 270, 610 270" marker-end="url(#ar)"/>
+        </g>
+        <g font-family="IBM Plex Sans, sans-serif" font-size="14" text-anchor="middle">
+          <rect x="30" y="125" width="120" height="90" rx="18" fill="var(--surface)" stroke="var(--line)"/>
+          <text x="90" y="165" font-family="Bricolage Grotesque, sans-serif" font-size="22" font-weight="800" fill="var(--fg)">Sen</text>
+          <text x="90" y="188" fill="var(--muted)" font-size="12">konuş · onayla</text>
+
+          <rect x="300" y="105" width="170" height="130" rx="22" fill="var(--surface)" stroke="var(--violet)" stroke-width="2"/>
+          <text x="385" y="150" font-family="Bricolage Grotesque, sans-serif" font-size="22" font-weight="800" fill="var(--fg)">AI ajanlar</text>
+          <text x="385" y="175" fill="var(--muted)" font-size="12">yazar · çizer · planlar</text>
+          <text x="385" y="195" fill="var(--muted)" font-size="12">MCP / API</text>
+
+          <rect x="610" y="35" width="130" height="70" rx="16" fill="var(--surface)" stroke="var(--blue)" stroke-width="2"/>
+          <text x="675" y="66" font-family="Bricolage Grotesque, sans-serif" font-size="18" font-weight="800" fill="var(--blue)">BookStack</text>
+          <text x="675" y="86" fill="var(--muted)" font-size="12">belge · karar</text>
+          <rect x="610" y="135" width="130" height="70" rx="16" fill="var(--surface)" stroke="var(--mint)" stroke-width="2"/>
+          <text x="675" y="166" font-family="Bricolage Grotesque, sans-serif" font-size="18" font-weight="800" fill="var(--mint)">Penpot</text>
+          <text x="675" y="186" fill="var(--muted)" font-size="12">tasarım</text>
+          <rect x="610" y="235" width="130" height="70" rx="16" fill="var(--surface)" stroke="var(--violet)" stroke-width="2"/>
+          <text x="675" y="266" font-family="Bricolage Grotesque, sans-serif" font-size="18" font-weight="800" fill="var(--violet)">Plane</text>
+          <text x="675" y="286" fill="var(--muted)" font-size="12">iş takibi</text>
+        </g>
+        <text x="225" y="160" text-anchor="middle" font-size="11" fill="var(--muted)" font-family="IBM Plex Sans, sans-serif">istek</text>
+        <text x="225" y="212" text-anchor="middle" font-size="11" fill="var(--muted)" font-family="IBM Plex Sans, sans-serif">soru · onay</text>
+        <circle class="pk" r="5" fill="var(--pink)"><animateMotion dur="3s" repeatCount="indefinite" path="M150 170 H300"/></circle>
+        <circle class="pk" r="5" fill="var(--amber)"><animateMotion dur="3s" begin="1.5s" repeatCount="indefinite" path="M300 190 H150"/></circle>
+        <circle class="pk" r="5" fill="var(--blue)"><animateMotion dur="3s" repeatCount="indefinite" path="M470 150 C 540 90, 560 70, 610 70"/></circle>
+        <circle class="pk" r="5" fill="var(--mint)"><animateMotion dur="3s" begin=".5s" repeatCount="indefinite" path="M470 170 H610"/></circle>
+        <circle class="pk" r="5" fill="var(--violet)"><animateMotion dur="3s" begin="1s" repeatCount="indefinite" path="M470 190 C 540 250, 560 270, 610 270"/></circle>
+      </svg>
+    </figure>
+  </section>
+
   <section id="ne">
-    <div class="eyebrow">Ne bu?</div>
-    <h2>Üç uygulama, tek merkez</h2>
+    <div class="eyebrow">Uygulamalar</div>
+    <h2>Her uygulama ne yapar</h2>
     <div class="cols">
-      <div class="card b"><div class="ico">B</div><h3>BookStack</h3><p>Wiki ve belge rafı. Sorular, kararlar, planlar burada durur. Panel bu uygulamanın ana sayfasına oturur.</p></div>
-      <div class="card m"><div class="ico">P</div><h3>Penpot</h3><p>Açık kaynak tasarım aracı. Arayüz taslakları ve tasarım sistemi için.</p></div>
-      <div class="card v"><div class="ico">L</div><h3>Plane</h3><p>İş ve sprint takibi. Panelden tek tıkla açılır.</p></div>
-      <div class="card p"><div class="ico">◧</div><h3>Panel</h3><p>Seni bekliyor, Devam eden, Son değişiklikler, Projeler. Tarayıcıda, oturumunla çalışır; token gerektirmez.</p></div>
+      <div class="card b">
+        <div class="viz viz-book">
+          <div class="crumb">Proje › İş Planı › Spec</div>
+          <div class="row"><i></i><b>Sorular</b><em class="chip">Açık</em></div>
+          <div class="row"><i></i><b>Karar Kaydı</b><em class="chip ok">Karar</em></div>
+          <div class="row"><i></i><b>Spec 0001</b><em class="chip">İmza</em></div>
+        </div>
+        <h3>BookStack</h3>
+        <p>Raf, kitap, sayfa düzeninde wiki. Ajan spec, karar ve soru sayfalarını yazar; sorular panelde "Seni bekliyor" olarak çıkar. Sayfa yorumu cevap sayılır.</p>
+      </div>
+      <div class="card m">
+        <div class="viz viz-pen">
+          <svg viewBox="0 0 220 120" aria-hidden="true">
+            <rect x="8" y="8" width="204" height="104" rx="8" fill="none" stroke="var(--mint)" stroke-dasharray="4 4"/>
+            <rect class="s1" x="22" y="22" width="80" height="48" rx="8" fill="var(--blue)"/>
+            <circle class="s2" cx="146" cy="46" r="24" fill="var(--pink)"/>
+            <rect class="s3" x="22" y="82" width="176" height="14" rx="7" fill="var(--violet)"/>
+          </svg>
+        </div>
+        <h3>Penpot</h3>
+        <p>Açık kaynak tasarım aracı. Ajan ekran taslağını ve bileşenleri çizer; sen tuval üzerinde bakıp yorum bırakırsın.</p>
+      </div>
+      <div class="card v">
+        <div class="viz viz-kan">
+          <div class="col"><u>Yapılacak</u><span></span><span></span></div>
+          <div class="col"><u>Sürüyor</u><span class="mv"></span></div>
+          <div class="col"><u>Bitti</u><span></span><span></span><span></span></div>
+        </div>
+        <h3>Plane</h3>
+        <p>İş ve sprint takibi. Ajan iş açar, durumunu ilerletir, bitirince kapatır. Sen panelden tek tıkla tahtaya geçersin.</p>
+      </div>
+      <div class="card p">
+        <div class="viz viz-panel">
+          <div class="pn"><b>Seni bekliyor</b><em>3</em></div>
+          <div class="pn"><b>Devam eden</b><em>5</em></div>
+          <div class="pn"><b>Son değişiklikler</b><em>12</em></div>
+          <div class="pn"><b>Projeler</b><em>4</em></div>
+        </div>
+        <h3>Panel</h3>
+        <p>BookStack ana sayfasında dört bölüm: sana düşen işler, süren işler, son değişiklikler ve projeler. Tarayıcıda oturumunla çalışır, token gerektirmez.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="ozellik">
+    <div class="eyebrow">Özellikler</div>
+    <h2>Ayrıntılı bakış</h2>
+    <div class="feat">
+      <div class="fc b">
+        <div class="fviz"><svg viewBox="0 0 320 170" role="img" aria-label="Kitaplar rafa dizilir, sayfa yazılır, yorum gelir">
+  <rect x="14" y="128" width="130" height="6" rx="3" fill="var(--line)"/>
+  <g class="bk-g">
+    <rect class="bk b1" x="24" y="64" width="22" height="64" rx="3" fill="var(--blue)"/>
+    <rect class="bk b2" x="50" y="48" width="22" height="80" rx="3" fill="var(--pink)"/>
+    <rect class="bk b3" x="76" y="72" width="22" height="56" rx="3" fill="var(--mint)"/>
+    <rect class="bk b4" x="102" y="56" width="22" height="72" rx="3" fill="var(--violet)"/>
+  </g>
+  <rect x="164" y="16" width="140" height="130" rx="10" fill="var(--bg)" stroke="var(--line)"/>
+  <rect x="178" y="30" width="60" height="9" rx="4" fill="var(--blue)"/>
+  <rect class="ln l1" x="178" y="52" width="110" height="6" rx="3" fill="var(--muted)"/>
+  <rect class="ln l2" x="178" y="68" width="96" height="6" rx="3" fill="var(--muted)"/>
+  <rect class="ln l3" x="178" y="84" width="108" height="6" rx="3" fill="var(--muted)"/>
+  <rect class="ln l4" x="178" y="100" width="70" height="6" rx="3" fill="var(--muted)"/>
+  <g class="bub"><rect x="236" y="112" width="62" height="26" rx="8" fill="var(--amber)"/><rect x="246" y="121" width="42" height="5" rx="2.5" fill="var(--bg)"/></g>
+</svg></div>
+        <h3>BookStack <small>wiki ve belge</small></h3>
+        <ul>
+          <li><b>Raf, kitap, bölüm, sayfa:</b> belgeler dört katmanlı bir düzende durur, projeler rafa karşılık gelir.</li>
+          <li><b>İki düzenleyici:</b> görsel (WYSIWYG) ve Markdown. Ajan HTML ya da Markdown yazabilir.</li>
+          <li><b>Sürüm geçmişi:</b> her kayıt revizyon olarak saklanır, eski hâle dönülür.</li>
+          <li><b>Yorumlar:</b> sayfadaki yorum, ajana cevap olarak okunur.</li>
+          <li><b>Rol ve izinler:</b> kitap ve raf düzeyinde kim görür, kim yazar ayarlanır.</li>
+          <li><b>Arama ve REST API:</b> ajanlar sayfaları arar, okur, oluşturur ve günceller.</li>
+        </ul>
+      </div>
+      <div class="fc m">
+        <div class="fviz"><svg viewBox="0 0 320 170" role="img" aria-label="İki kişi aynı tuvalde şekilleri düzenler">
+  <rect x="16" y="14" width="288" height="142" rx="10" fill="var(--bg)" stroke="var(--mint)" stroke-dasharray="5 5"/>
+  <rect class="pshape r1" x="40" y="36" width="96" height="58" rx="10" fill="var(--blue)"/>
+  <circle class="pshape c1" cx="226" cy="66" r="30" fill="var(--pink)"/>
+  <rect class="pshape bar" x="40" y="116" width="150" height="16" rx="8" fill="var(--violet)"/>
+  <rect x="40" y="116" width="150" height="16" rx="8" fill="none" stroke="var(--mint)" stroke-width="1.5" stroke-dasharray="3 3"/>
+  <g class="cur cur1"><path d="M0 0L0 14L4 11L8 18L10 17L6 10L11 10Z" fill="var(--blue)" stroke="var(--bg)"/><rect x="12" y="14" width="26" height="12" rx="6" fill="var(--blue)"/></g>
+  <g class="cur cur2"><path d="M0 0L0 14L4 11L8 18L10 17L6 10L11 10Z" fill="var(--mint)" stroke="var(--bg)"/><rect x="12" y="14" width="26" height="12" rx="6" fill="var(--mint)"/></g>
+</svg></div>
+        <h3>Penpot <small>tasarım</small></h3>
+        <ul>
+          <li><b>Açık kaynak tasarım aracı:</b> tarayıcıda çalışır, kendi makinende tutulur.</li>
+          <li><b>Flex ve grid yerleşim:</b> CSS'e benzer düzenle, duyarlı ekranlar çizilir.</li>
+          <li><b>Bileşenler ve tasarım sistemi:</b> renk, yazı tipi ve bileşenler tek yerde, tüm ekranlarda ortak.</li>
+          <li><b>Prototip:</b> ekranlar arası geçişler tıklanabilir önizlenir.</li>
+          <li><b>Gerçek zamanlı ortak çalışma:</b> aynı tuvalde birden fazla kişi ve ajan.</li>
+          <li><b>SVG tabanlı, geliştirici bakışı:</b> ölçüler ve CSS çıktısı koda aktarılır.</li>
+        </ul>
+      </div>
+      <div class="fc v">
+        <div class="fviz"><svg viewBox="0 0 320 170" role="img" aria-label="İş kartı kolonlar arasında ilerler, döngü dolar">
+  <g fill="var(--bg)" stroke="var(--line)"><rect x="12" y="12" width="94" height="106" rx="8"/><rect x="113" y="12" width="94" height="106" rx="8"/><rect x="214" y="12" width="94" height="106" rx="8"/></g>
+  <g font-family="JetBrains Mono, monospace" font-size="8" fill="var(--muted)"><text x="20" y="26">YAPILACAK</text><text x="121" y="26">SÜRÜYOR</text><text x="222" y="26">BİTTİ</text></g>
+  <rect x="20" y="62" width="78" height="16" rx="5" fill="var(--blue)" opacity=".7"/>
+  <rect x="121" y="84" width="78" height="16" rx="5" fill="var(--mint)" opacity=".7"/>
+  <rect x="222" y="34" width="78" height="16" rx="5" fill="var(--violet)" opacity=".7"/>
+  <rect x="222" y="56" width="78" height="16" rx="5" fill="var(--violet)" opacity=".7"/>
+  <rect class="kcard" x="20" y="34" width="78" height="16" rx="5" fill="var(--pink)"/>
+  <rect x="12" y="132" width="296" height="10" rx="5" fill="var(--line)"/>
+  <rect class="cyc" x="12" y="132" width="296" height="10" rx="5" fill="var(--violet)"/>
+  <text x="12" y="160" font-family="JetBrains Mono, monospace" font-size="9" fill="var(--muted)">DÖNGÜ İLERLEMESİ</text>
+</svg></div>
+        <h3>Plane <small>iş takibi</small></h3>
+        <ul>
+          <li><b>İşler:</b> durum, öncelik, atanan, etiket ve alt işlerle takip.</li>
+          <li><b>Döngüler (sprint):</b> belirli süreli iş paketleri ve ilerleme grafiği.</li>
+          <li><b>Modüller:</b> büyük özellikleri ve hedefleri gruplar.</li>
+          <li><b>Çoklu görünüm:</b> liste, kanban tahtası, takvim ve zaman çizelgesi.</li>
+          <li><b>Kayıtlı filtreler:</b> sık kullanılan iş görünümlerini saklar.</li>
+          <li><b>Genel API:</b> ajanlar iş açar, durumu ilerletir, yorum bırakır.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="together">
+      <h3>Birlikte</h3>
+      <p>Ajan bir fikri Plane'de işe çevirir, ayrıntısını BookStack'e spec olarak yazar, ekranını Penpot'ta çizer. Üçü birbirine bağlantı verir. Karar gerektiğinde BookStack'te soru sayfası açılır ve panel seni uyarır.</p>
+    </div>
+  </section>
+
+  <section id="kisisel">
+    <div class="eyebrow">Kişiselleştirme</div>
+    <h2>Senin düzenine göre ayarlanır</h2>
+    <p class="sub">Üç uygulama da kendi makinende çalıştığı için görünümünü ve işleyişini istediğin gibi değiştirebilirsin. Ayarlar yalnızca o makinede kalır.</p>
+    <div class="cols">
+      <div class="card b"><h3>BookStack</h3><p>Özel başlık HTML'i ve CSS ile görünümü değiştir, ana sayfayı istediğin sayfaya çevir (panel böyle kurulur), logo, ad ve ana rengi seç, koyu mod aç, kitap ve rafları kendi proje yapına göre düzenle.</p></div>
+      <div class="card m"><h3>Penpot</h3><p>Açık ve koyu tema arasında geç, renk, yazı tipi ve bileşenleri kendi kütüphanende topla, takım ve proje yapısını kur.</p></div>
+      <div class="card v"><h3>Plane</h3><p>İş durumlarını, etiketleri ve öncelikleri kendi akışına göre kur, kayıtlı görünümler ve döngülerle işi istediğin biçimde grupla.</p></div>
+      <div class="card p"><h3>Makineye özel ayar</h3><p>Portlar ve gizli anahtarlar <code>local/.env</code> dosyasında durur. Her makine kendi ayarını taşır, depoya girmez, diğer makineleri etkilemez.</p></div>
+    </div>
+  </section>
+
+  <section id="senaryo">
+    <div class="eyebrow">Kullanım senaryoları</div>
+    <h2>Gerçek bir gün nasıl geçer</h2>
+    <div class="scen">
+      <article class="sc">
+        <h3>Yeni özellik fikri</h3>
+        <div class="msg me">"Uygulamaya karanlık mod ekleyelim."</div>
+        <div class="msg ai">Plane'de "Karanlık mod" işini açtım. BookStack'te spec taslağını yazdım. Penpot'ta açık ve koyu iki ekran çizdim.</div>
+        <div class="msg ai ask">BookStack'te Sorular sayfasına yazdım: sistem temasını mı izleyelim, elle seçim mi olsun? Panelde "Seni bekliyor" altında.</div>
+        <div class="msg me">Sayfaya yorum: "Sistem temasını izlesin."</div>
+        <div class="msg ai">Spec'i güncelledim, iş "Sürüyor" durumunda.</div>
+      </article>
+      <article class="sc">
+        <h3>Hata bildirimi</h3>
+        <div class="msg me">"Giriş sayfası telefonda taşıyor."</div>
+        <div class="msg ai">Plane'de hata kaydı açtım, ekran görüntüsünü ve adımları ekledim. Düzeltme işini "Sürüyor"a aldım.</div>
+        <div class="msg ai">Düzeltme bitti. Karar Kaydı'na "mobil breakpoint 400px" notunu düştüm, iş kapandı.</div>
+      </article>
+      <article class="sc">
+        <h3>Haftalık durum</h3>
+        <div class="msg me">"Bu hafta ne oldu?"</div>
+        <div class="msg ai">5 iş bitti, 3 sürüyor. 2 kararı Sorular sayfasına yazdım, panelde "Seni bekliyor" altında.</div>
+        <div class="msg me">Sayfaya yorum: "İkisini onayladım."</div>
+        <div class="msg ai">Kararları Karar Kaydı'na işledim, bağlı işleri açtım.</div>
+      </article>
     </div>
   </section>
 
@@ -139,13 +424,19 @@ footer{padding-block:64px 56px;color:var(--muted);font:13px var(--mono)}
     <div class="road">
       <div class="step"><span class="pill ok">hazır</span><div><strong>BookStack paneli</strong><span>Dört bölüm: bekleyen işler, devam edenler, son değişiklikler, projeler.</span></div></div>
       <div class="step"><span class="pill ok">hazır</span><div><strong>Belgeler ve testler</strong><span>Spec 0001 ve 0002, mimari görüşler, tema testleri.</span></div></div>
-      <div class="step"><span class="pill todo">planlı</span><div><strong>Docker Compose kurulumu ve <code>./stack</code> komutu</strong><span>Üç uygulamayı tek komutla kuran ortak kurulum.</span></div></div>
+      <div class="step"><span class="pill ok">hazır</span><div><strong>Docker Compose kurulumu ve <code>./stack</code> komutu</strong><span>BookStack, Penpot ve Plane tek komutla kurulur: <code>init</code>, <code>up</code>, <code>status</code>, <code>logs</code>, <code>backup</code>, <code>down</code>. Sabit sürümler, 127.0.0.1'e bağlı portlar, secret'lar yerel <code>local/</code> klasöründe.</span></div></div>
     </div>
   </section>
 
   <section id="kurulum">
     <div class="eyebrow">Kurulum</div>
-    <h2>Paneli kendi BookStack'ine taşı</h2>
+    <h2>Üç uygulamayı ayağa kaldır</h2>
+    <pre class="code" id="c0"><button class="copy" data-t="c0">kopyala</button>git clone https://github.com/GktuOktay/selfhost-stack
+cd selfhost-stack
+./stack init
+./stack up all</pre>
+    <p style="color:var(--muted);margin:12px 0 0">BookStack 8701, Penpot 8702, Plane 8703 portunda açılır. Ayrıntılar README'de.</p>
+    <h3 style="font-size:24px;margin:36px 0 0">Paneli kendi BookStack'ine taşı</h3>
     <p style="color:var(--muted);margin:0">BookStack'te yönetici hesabı gerekir. Ayrıntılar ve geri alma adımları <code>dashboard/README.md</code> içinde.</p>
     <pre class="code" id="c1"><button class="copy" data-t="c1">kopyala</button>git clone https://github.com/GktuOktay/selfhost-stack
 cd selfhost-stack</pre>
@@ -156,19 +447,31 @@ cd selfhost-stack</pre>
     </div>
   </section>
 
+  <section id="kaynak">
+    <div class="eyebrow">Kaynaklar</div>
+    <h2>Arkadaki uygulamalar</h2>
+    <p class="sub">Selfhost Stack bu açık kaynak projeleri bir araya getirir. Hepsi kendi geliştiricilerine aittir.</p>
+    <div class="cols">
+      <a class="card b src" href="https://github.com/BookStackApp/BookStack" target="_blank" rel="noopener"><h3>BookStack</h3><p>github.com/BookStackApp/BookStack</p><span class="chip ok">MIT</span></a>
+      <a class="card m src" href="https://github.com/penpot/penpot" target="_blank" rel="noopener"><h3>Penpot</h3><p>github.com/penpot/penpot</p><span class="chip ok">MPL-2.0</span></a>
+      <a class="card v src" href="https://github.com/makeplane/plane" target="_blank" rel="noopener"><h3>Plane</h3><p>github.com/makeplane/plane</p><span class="chip ok">AGPL-3.0</span></a>
+    </div>
+  </section>
+
   <section id="hakkinda">
     <div class="eyebrow">Hakkında</div>
     <h2>Proje</h2>
     <div class="about">
       <div>
-        <p>Selfhost Stack, tek kişilik bir ekibin bilgi, tasarım ve iş takibini kendi sunucusunda tutma denemesidir. Veri başkasının bulutunda durmaz, araçlar birbirinden habersiz kalmaz.</p>
-        <p>Hata bulursan ya da kendi makinene uyarlarken takılırsan GitHub'da issue aç.</p>
+        <p>Selfhost Stack, bilgi, tasarım ve iş takibini tek çatı altında kendi makinende çalıştırır. Verin sende kalır, üç araç birbirine bağlı çalışır, yapay zekâ ajanları işi yürütür.</p>
+        <p>Açık kaynak ve MIT lisanslı. Katkı, hata bildirimi ve fikirler için GitHub'da issue aç.</p>
       </div>
       <dl>
         <dt>Yazar</dt><dd>Göktuğ Oktay</dd>
         <dt>Depo</dt><dd><a href="https://github.com/GktuOktay/selfhost-stack" target="_blank" rel="noopener">github.com/GktuOktay/selfhost-stack</a></dd>
         <dt>Uygulamalar</dt><dd>BookStack, Penpot, Plane</dd>
         <dt>Çalışma</dt><dd>Docker, yerel makine</dd>
+        <dt>Lisans</dt><dd>MIT (uygulamalar kendi lisansında)</dd>
       </dl>
     </div>
   </section>
@@ -187,6 +490,39 @@ cd selfhost-stack</pre>
       try{navigator.clipboard.writeText(txt).then(ok,function(){})}catch(e){}
     });
   });
+
+
+  // chat animation
+  (function(){
+    var scen=document.querySelector('.scen');
+    if(!scen||window.matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+    var cards=[].slice.call(scen.querySelectorAll('.sc'));
+    cards.forEach(function(c){
+      c.style.minHeight=c.offsetHeight+'px';
+      var t=document.createElement('div');t.className='typing';t.innerHTML='<i></i><i></i><i></i>';c.appendChild(t);c._t=t;
+    });
+    scen.classList.add('live');
+    var timers=[];
+    function later(fn,ms){timers.push(setTimeout(fn,ms))}
+    function play(card,startDelay){
+      var msgs=[].slice.call(card.querySelectorAll('.msg')),t=card._t,at=startDelay;
+      msgs.forEach(function(m){m.classList.remove('on')});
+      msgs.forEach(function(m){
+        var ai=m.classList.contains('ai');
+        if(ai){var a=at;later(function(){t.classList.add('on')},a);at+=1100}
+        else{at+=700}
+        var shown=at;
+        later(function(){t.classList.remove('on');m.classList.add('on')},shown);
+        at+=1500;
+      });
+      later(function(){play(card,0)},at+3500);
+    }
+    var started=false;
+    function start(){if(started)return;started=true;cards.forEach(function(c,i){play(c,i*600)})}
+    if('IntersectionObserver' in window){
+      new IntersectionObserver(function(en){if(en[0].isIntersecting)start()},{threshold:.2}).observe(scen);
+    }else{start()}
+  })();
 
   var canvas=document.getElementById('gl'),stage=document.getElementById('stage');
   if(!window.THREE){return}
