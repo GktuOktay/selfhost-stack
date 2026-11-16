@@ -33,6 +33,7 @@
   .dash-root .dash-chips { flex: 0 0 auto; display: flex; gap: 6px; align-items: center; }
   .dash-root .dash-chip { font-size: 11px; font-weight: 700; padding: 2px 9px; border-radius: 99px; white-space: nowrap; max-width: 220px; overflow: hidden; text-overflow: ellipsis; background: rgba(127,127,127,.18); }
   .dash-root .dash-chip.soru { background: rgba(245,158,11,.2); color: #d97706; } .dash-root .dash-chip.is { background: rgba(59,130,246,.2); color: #2563eb; }
+  .dash-root .dash-chip.sign { background: rgba(20,184,166,.18); color: #0f766e; }
   .dash-root .dash-chip.acik { background: rgba(239,68,68,.16); color: #dc2626; } .dash-root .dash-chip.pj { background: rgba(168,85,247,.16); color: #9333ea; }
   .dash-root .dash-em { font-size: 13px; opacity: .55; padding: 8px 0 12px; }
   .dash-root .dash-ch { display: inline-block; margin: 0 8px 8px 0; padding: 4px 12px; border-radius: 99px; border: 1px solid var(--dl); font-size: 13px; font-weight: 600; text-decoration: none; color: inherit; }
@@ -69,7 +70,7 @@
         if (!mode || line.charAt(0) !== "|" || /^\|\s*-/.test(line) || /^\|\s*#\s*\|/.test(line)) return;
         var c = line.split("|").slice(1, -1).map(function (x) { return x.trim(); });
         if (c.length < 3) return;
-        if (mode === "open") { if (/^a[çc]ık$/i.test(c[c.length - 1])) open.push({ id: c[0], text: clean(c[1]), rec: clean(c[2]) }); } else done++;
+        if (mode === "open") { if (/^a[çc]ık$/i.test(c[c.length - 1])) { var tm = /(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2})/.exec(c[3] || ""); open.push({ id: c[0], text: clean(c[1]), rec: clean(c[2]), at: tm ? Date.parse(tm[1] + "T" + tm[2] + ":00+03:00") : 0 }); } } else done++;
       });
       return { open: open, done: done };
     }
@@ -78,19 +79,21 @@
         return Promise.all(l.data.map(function (p) { return api("/pages/" + p.id).then(function (d) { var r = parse(d.markdown); r.kind = kind; r.book = p.book_id; r.href = "/link/" + p.id; return r; }).catch(function () { return null; }); }));
       });
     }
-    Promise.all([shelves, collect("Sorular", "Soru"), collect("Beklenenler", "İş")]).then(function (r) {
+    function signs() { return api("/search?query=" + encodeURIComponent("{type:page} [durum=imza-bekliyor]") + "&count=50").then(function (l) { return l.data || []; }).catch(function () { return []; }); }
+    Promise.all([shelves, collect("Sorular", "Soru"), collect("Beklenenler", "İş"), signs()]).then(function (r) {
       var pages = r[1].concat(r[2]).filter(Boolean), by = {}, rows = [];
-      pages.forEach(function (p) { var pj = shelfOf[p.book] || "Diğer"; var o = by[pj] || (by[pj] = { open: 0, done: 0 }); o.open += p.open.length; o.done += p.done; p.open.forEach(function (it) { rows.push({ it: it, kind: p.kind, pj: pj, href: p.href }); }); });
+      pages.forEach(function (p) { var pj = shelfOf[p.book] || "Diğer"; var o = by[pj] || (by[pj] = { open: 0, done: 0 }); o.open += p.open.length; o.done += p.done; p.open.forEach(function (it) { rows.push({ it: it, kind: p.kind, pj: pj, href: p.href, at: it.at || 0, n: rows.length }); }); });
+      r[3].forEach(function (p) { rows.push({ it: { id: "Spec", text: p.name, rec: "İmzanı bekliyor" }, kind: "Spec", pj: shelfOf[p.book_id] || "Diğer", href: "/link/" + p.id, at: Date.parse(p.updated_at) || 0, n: rows.length }); });
+      rows.sort(function (x, y) { return y.at - x.at || y.n - x.n; }); // en yeni üstte
       var b = body("wait");
       if (b) {
         count("wait", rows.length);
         var sum = el("div", "dash-sum"); Object.keys(by).forEach(function (k) { var o = by[k]; var a = el("span", "dash-pj", k); a.appendChild(el("em", o.open ? "o" : "z", o.open + " açık")); a.appendChild(el("em", "d", o.done + " cevaplandı")); sum.appendChild(a); }); b.appendChild(sum);
         if (!rows.length) b.appendChild(el("div", "dash-em", "Cevap bekleyen bir şey yok"));
-        rows.slice(0, 5).forEach(function (x) {
+        rows.forEach(function (x) {
           var a = el("a", "dash-it"); a.href = x.href; a.appendChild(el("span", "dash-id", x.it.id)); a.appendChild(el("span", "dash-tx", x.it.text)); a.appendChild(el("span", "dash-rc", x.it.rec));
-          var ch = el("span", "dash-chips"); ch.appendChild(el("span", "dash-chip pj", x.pj)); ch.appendChild(el("span", "dash-chip " + (x.kind === "Soru" ? "soru" : "is"), x.kind)); ch.appendChild(el("span", "dash-chip acik", "Açık")); a.appendChild(ch); b.appendChild(a);
+          var ch = el("span", "dash-chips"); ch.appendChild(el("span", "dash-chip pj", x.pj)); ch.appendChild(el("span", "dash-chip " + (x.kind === "Soru" ? "soru" : x.kind === "Spec" ? "sign" : "is"), x.kind)); ch.appendChild(el("span", "dash-chip acik", x.kind === "Spec" ? "İmza bekliyor" : "Açık")); a.appendChild(ch); b.appendChild(a);
         });
-        if (rows.length > 5) b.appendChild(el("div", "dash-em", "+ " + (rows.length - 5) + " tane daha"));
       }
       var sl = body("shelves"); if (sl) { r[0].forEach(function (s) { var o = by[s.name] || { open: 0, done: 0 }; var a = el("a", "dash-ch", s.name); a.href = "/shelves/" + s.slug; a.appendChild(el("i", "", s.n + " kitap · " + o.open + " açık")); sl.appendChild(a); }); count("shelves", r[0].length); }
     }).catch(function () { fail("wait"); fail("shelves"); });
