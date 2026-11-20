@@ -5,6 +5,12 @@
 #   ./stack init
 #   ./stack up|down|status|backup [bookstack|penpot|plane|all]   (argümansız = all)
 #   ./stack logs <bookstack|penpot|plane> [servis] [-f]
+#   ./stack export penpot --list
+#   ./stack export penpot <proje-adı|id> [-o dizin] [--embed-assets]
+#   ./stack import penpot <arşiv dizini|.tar> [--team <ad>] [--project <ad>]
+# export/import: proje taşıma (Penpot binfile). Çıktı local/exports/penpot/<UTC>/ (+ <UTC>.tar) altına
+#   manifest.json ve .penpot dosyaları olarak yazılır (700/600). Kimlik: ortamdan PENPOT_ACCESS_TOKEN ya da
+#   PENPOT_EMAIL+PENPOT_PASSWORD (yoksa terminalde sorulur); ARGV'ye secret konmaz.
 # Env: yalnız HEALTH_TIMEOUT (sn, varsayılan 600) ve STACK_LOCAL_DIR (mutlak yol).
 # Çıkış kodları: 0 ok · 1 kullanım · 2 ön koşul · 3 port dolu · 4 health zaman aşımı
 #                5 yedek/başlatma hatası · 6 güvenlik kapısı
@@ -33,6 +39,10 @@
 #                   (örn. "default-login: no", "plane-admin: unclaimed").
 #   app_up_note     Opsiyonel. Başarı satırından sonra basılır (ilk kurulumda admin e-postası ve
 #                   parolanın .env ANAHTAR ADI; parolanın kendisi asla).
+#   app_export list | app_export run <dizin> <seçici> <include|embed>   Opsiyonel. Proje dışa aktarımı
+#                   (dizin 700 açılmış gelir; manifest.json yazmak hook'un işi). 0 ok, 1 seçim/kullanım, 2 ön koşul.
+#   app_import <dizin> <takım|""> <proje|"">   Opsiyonel. Doğrulanmış arşiv dizinini içeri alır (hash'ler
+#                   hook'ta kontrol edilir). export/import için `stack` yalnız health ve .env ister (docker değil).
 #   app_backup <hedef_dizin>  T-5. Dizin 700 önceden açılır; db.sql + volume tar'ları yazılır (600).
 # ---------------------------------------------------------------------------
 
@@ -48,7 +58,9 @@ ALL_KEYS="BOOKSTACK_PORT BOOKSTACK_DB_PASSWORD BOOKSTACK_DB_ROOT_PASSWORD BOOKST
 
 SECRETS_FILE=""
 ENV_TMP=""
+IMPORT_TMP=""
 cleanup() {
+  [ -n "$IMPORT_TMP" ] && rm -rf "$IMPORT_TMP"
   [ -n "$SECRETS_FILE" ] && rm -f "$SECRETS_FILE"
   [ -n "$ENV_TMP" ] && rm -f "$ENV_TMP"
   return 0
@@ -382,6 +394,92 @@ backup_app() { # app_backup hook'unu çağırır; dosya/mod/tar doğrulaması bu
   return 0
 }
 
+# ---------- proje taşıma (export/import) ----------
+prepare_transfer() { # app
+  need_cmd curl
+  [ -f "$ENVFILE" ] || die 2 "$(local_hint) yok; önce ./stack init"
+  load_env "$ENVFILE"
+  validate_ports
+  require_keys "$(app_keys "$1")"
+  build_mask
+  set_ctx "$1"
+  check_app_files "$1" || exit 2
+  hook_defined "$1" app_export || die 1 "$1 proje dışa/içe aktarımını desteklemiyor"
+  run_hook "$1" app_health >/dev/null 2>&1 || die 2 "$1 çalışmıyor ya da sağlıksız; önce ./stack up $1"
+}
+hook_rc() { case $1 in 0|1|2) return "$1" ;; *) return 5 ;; esac; }
+
+export_app() { # app list(0/1) selector out embed(0/1)
+  local app=$1 list=$2 sel=$3 out=$4 embed=$5 ts dir base rc kind=include
+  prepare_transfer "$app"
+  if [ "$list" = 1 ]; then
+    run_hook "$app" app_export list 2>&1 | mask
+    rc=${PIPESTATUS[0]}
+    [ "$rc" -eq 0 ] || { err "$app proje listesi alınamadı (kod $rc)"; hook_rc "$rc"; return; }
+    return 0
+  fi
+  [ "$embed" = 1 ] && kind=embed
+  ts=$(date -u +%Y%m%dT%H%M%SZ)
+  if [ -n "$out" ]; then
+    out=${out%/}
+    if [ -e "$out" ]; then
+      [ -d "$out" ] && [ -z "$(ls -A "$out")" ] || die 1 "$out zaten var ve boş değil"
+    else
+      mkdir -p "$out" || die 5 "$out oluşturulamadı"
+    fi
+    dir=$(cd "$out" && pwd -P) || die 5 "$out açılamadı"
+  else
+    base=$LOCAL/exports/$app
+    mkdir -p "$LOCAL/exports" "$base" || die 5 "$base oluşturulamadı"
+    chmod 700 "$LOCAL/exports" "$base" || die 5 "$base izni ayarlanamadı"
+    dir=$base/$ts
+    mkdir "$dir" || die 5 "$dir oluşturulamadı (aynı saniyede ikinci dışa aktarım?)"
+  fi
+  chmod 700 "$dir" || die 5 "$dir izni ayarlanamadı"
+  run_hook "$app" app_export run "$dir" "$sel" "$kind" 2>&1 | mask
+  rc=${PIPESTATUS[0]}
+  if [ "$rc" -ne 0 ] || [ ! -s "$dir/manifest.json" ]; then
+    [ "$rc" -eq 0 ] && rc=5
+    rm -rf "$dir"
+    err "$app dışa aktarımı başarısız (kod $rc); yarım çıktı silindi"
+    hook_rc "$rc"; return
+  fi
+  tar -C "$(dirname "$dir")" -cf "$dir.tar" "$(basename "$dir")" 2>/dev/null && chmod 600 "$dir.tar" ||
+    warn "tar arşivi oluşturulamadı; dizini kopyalayabilirsin"
+  info "OK $app dışa aktarım ${dir#"$LOCAL"/}"
+  [ -f "$dir.tar" ] && info "arşiv ${dir#"$LOCAL"/}.tar (diğer bilgisayarda: ./stack import $app <arşiv>)"
+  return 0
+}
+
+import_app() { # app archive team project
+  local app=$1 arc=$2 team=$3 proj=$4 src bad rc
+  [ -e "$arc" ] || die 1 "arşiv yok: $(safe "$arc")"
+  prepare_transfer "$app"
+  if [ -d "$arc" ]; then
+    src=$(cd "$arc" && pwd -P) || die 1 "arşiv açılamadı"
+  else
+    need_cmd tar
+    tar -tf "$arc" >/dev/null 2>&1 || die 1 "arşiv okunamadı (tar değil ya da bozuk)"
+    bad=$(tar -tf "$arc" 2>/dev/null | awk '/^\// || /(^|\/)\.\.(\/|$)/ { print; exit }')
+    [ -z "$bad" ] || die 1 "arşiv güvensiz yol içeriyor; içeri alınmadı"
+    bad=$(tar -tvf "$arc" 2>/dev/null | awk 'substr($0,1,1) != "-" && substr($0,1,1) != "d" { print; exit }')
+    [ -z "$bad" ] || die 1 "arşiv dosya/dizin dışı girdi içeriyor (link, aygıt); içeri alınmadı"
+    IMPORT_TMP=$(mktemp -d "${TMPDIR:-/tmp}/stack-import.XXXXXX") || die 5 "geçici dizin açılamadı"
+    chmod 700 "$IMPORT_TMP"
+    tar -xf "$arc" -C "$IMPORT_TMP" || die 5 "arşiv açılamadı"
+    src=$IMPORT_TMP
+    if [ ! -f "$src/manifest.json" ]; then
+      for bad in "$IMPORT_TMP"/*/; do [ -f "${bad}manifest.json" ] && src=${bad%/}; done
+    fi
+  fi
+  [ -f "$src/manifest.json" ] || die 1 "arşivde manifest.json yok"
+  run_hook "$app" app_import "$src" "$team" "$proj" 2>&1 | mask
+  rc=${PIPESTATUS[0]}
+  if [ "$rc" -ne 0 ]; then err "$app içe aktarımı başarısız (kod $rc)"; hook_rc "$rc"; return; fi
+  info "OK $app içe aktarım tamam"
+  return 0
+}
+
 # all: her uygulamayı dener; ilk başarısızın (bookstack, penpot, plane) kodu çıkış kodudur
 run_each() { # fn app...
   local fn=$1 app rc first=0 multi=0
@@ -491,10 +589,10 @@ parse_app_arg() { # komut $@ -> APPS
 
 main() {
   local cmd=${1:-} svc="" follow=0 a
-  [ -n "$cmd" ] || die 1 "komut gerekli: init|up|down|status|logs|backup"
+  [ -n "$cmd" ] || die 1 "komut gerekli: init|up|down|status|logs|backup|export|import"
   shift
   case $cmd in
-    help|-h|--help) sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//'; return 0 ;;
+    help|-h|--help) sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'; return 0 ;;
     init)
       [ $# -eq 0 ] || die 1 "init argüman almaz"
       cmd_init ;;
@@ -518,6 +616,38 @@ main() {
         status) run_each status_app $APPS ;;
         backup) run_each backup_app $APPS ;;
       esac ;;
+    export|import)
+      [ $# -ge 1 ] || die 1 "$cmd bir uygulama ister: ./stack $cmd penpot ..."
+      a=$1
+      shift
+      case $a in
+        penpot) ;;
+        bookstack|plane) die 1 "$a proje dışa/içe aktarımını desteklemiyor (yalnız penpot)" ;;
+        *) die 1 "bilinmeyen uygulama '$(safe "$a")'" ;;
+      esac
+      local list=0 sel="" out="" embed=0 team="" proj="" arc=""
+      while [ $# -gt 0 ]; do
+        case $cmd:$1 in
+          export:--list) list=1 ;;
+          export:--embed-assets) embed=1 ;;
+          export:-o) [ $# -ge 2 ] || die 1 "-o bir dizin ister"; out=$2; shift ;;
+          import:--team) [ $# -ge 2 ] || die 1 "--team bir ad ister"; team=$2; shift ;;
+          import:--project) [ $# -ge 2 ] || die 1 "--project bir ad ister"; proj=$2; shift ;;
+          *:-*) die 1 "bilinmeyen seçenek '$(safe "$1")'" ;;
+          export:*) [ -z "$sel" ] || die 1 "export tek proje alır"; sel=$1 ;;
+          import:*) [ -z "$arc" ] || die 1 "import tek arşiv alır"; arc=$1 ;;
+        esac
+        shift
+      done
+      if [ "$cmd" = export ]; then
+        [ "$list" = 1 ] && [ -n "$sel$out" ] && die 1 "--list başka argüman almaz"
+        [ "$list" = 1 ] || [ -n "$sel" ] || die 1 "kullanım: ./stack export $a <proje-adı|id> [-o dizin] [--embed-assets] | --list"
+        export_app "$a" "$list" "$sel" "$out" "$embed"
+      else
+        [ -n "$arc" ] || die 1 "kullanım: ./stack import $a <arşiv dizini|.tar> [--team <ad>] [--project <ad>]"
+        import_app "$a" "$arc" "$team" "$proj"
+      fi
+      return $? ;;
     logs)
       [ $# -ge 1 ] || die 1 "logs bir uygulama ister: ./stack logs <bookstack|penpot|plane> [servis] [-f]"
       case $1 in
@@ -543,7 +673,7 @@ main() {
         stack_compose logs --no-color --tail 200 ${svc:+"$svc"} 2>&1 | mask
       fi
       return "${PIPESTATUS[0]}" ;;
-    *) die 1 "bilinmeyen komut '$(safe "$cmd")' (init|up|down|status|logs|backup)" ;;
+    *) die 1 "bilinmeyen komut '$(safe "$cmd")' (init|up|down|status|logs|backup|export|import)" ;;
   esac
 }
 
