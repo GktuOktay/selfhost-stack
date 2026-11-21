@@ -67,6 +67,8 @@ Tanıtım sayfası (3D, animasyonlu): [canlı sayfa](https://claude.ai/artifact/
 | `./stack status [app]` | Durumu yazar (ör. BookStack için `default-login: no`, Plane için `plane-admin: unclaimed`) |
 | `./stack logs <app> [servis]` | Son 200 satırı basar, `-f` ile izler. Tek uygulama ister |
 | `./stack backup [app]` | Veritabanı dökümünü ve dosya volume'larını `local/backups/<app>/<UTC>/` altına yazar. Uygulama çalışıyor olmalı |
+| `./stack export penpot <proje\|id> [-o dizin] [--embed-assets]` / `--list` | Penpot projesini `.penpot` dosyaları ve `manifest.json` (hash'li) olarak `local/exports/penpot/<UTC>/` altına (ve `.tar` olarak yanına) yazar. Penpot çalışıyor olmalı |
+| `./stack import penpot <dizin\|.tar> [--team ad] [--project ad]` | Arşivi önce hash'lerle doğrular, projeyi yoksa oluşturur, dosyaları içeri alır |
 | `./stack down [app]` | Container ve ağları kaldırır. Veri volume'larını silmez |
 
 `init`, `up`, `status`, `backup` ve `logs` çıktılarında secret değerleri `***` olarak görünür. Çıkış kodları: 0 başarı, 1 kullanım hatası, 2 ön koşul eksik, 3 port dolu, 4 sağlık zaman aşımı, 5 yedek ya da başlatma hatası, 6 güvenlik kapısı (varsayılan kimlik ya da talep edilmemiş admin).
@@ -88,6 +90,16 @@ Kayıt kapalıdır. İlk profil için upstream'in `prepl` sunucusunu geçici ola
 3. `PENPOT_EXTRA_FLAGS` değerini `local/.env` içinde boşalt ve `./stack up penpot` çalıştır. Backend `prepl` olmadan yeniden oluşur.
 
 `enable-prepl-server` kimliksiz bir REPL açar; kalıcı bırakma. Bayrak doluyken `status` uyarı verir.
+
+**Projeyi başka bilgisayara taşıma.** `export`/`import` Penpot'un kendi `binfile` biçimini kullanır. Kimlik için ortamda `PENPOT_EMAIL` ve `PENPOT_PASSWORD` (ya da `enable-access-tokens` bayrağıyla üretilmiş `PENPOT_ACCESS_TOKEN`) ver; yoksa terminalde sorulur. Parola komut satırına yazılmaz.
+
+```
+./stack export penpot --list
+./stack export penpot "Marka Seti"          # local/exports/penpot/<UTC>/ ve <UTC>.tar
+./stack import penpot marka.tar --team "Ekibim"
+```
+
+Varsayılan olarak dosyalar kütüphaneleriyle birlikte (`include-libraries`) dışa aktarılır; kütüphaneleri dosyanın içine gömmek için `--embed-assets` ver (ikisi birlikte kullanılamaz, Penpot izin vermez). Çıktı kullanıcının tasarım verisidir; yalnız sende kalan `local/` altında 700/600 izinle durur. Var olan bir projeye içe aktarırsan dosyalar eklenir, mevcutlar değişmez.
 
 ### Plane
 

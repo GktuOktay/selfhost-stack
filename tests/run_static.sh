@@ -6,7 +6,7 @@ cd "$(dirname "$0")/.." || exit 2
 rc=0
 export PYTHONDONTWRITEBYTECODE=1
 for t in tests/test_blade_scan.py tests/test_cb7_static.py tests/test_cb8_upstream.py \
-         tests/test_upgrade_diff_check.py tests/test_render.py; do
+         tests/test_upgrade_diff_check.py tests/test_render.py tests/test_penpot_transfer.py; do
   echo "== $t"
   python3 -I "$t" || rc=1
 done
