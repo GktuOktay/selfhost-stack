@@ -51,7 +51,7 @@ app_backup() {
 #   login-with-password {email,password} | access token ("Authorization: Token ...", enable-access-tokens)
 #   get-all-projects, get-teams, get-projects {team-id}, get-project-files {project-id}, create-project
 #   export-binfile {file-id,include-libraries,embed-assets} (ikisi ayni anda true OLAMAZ; SSE, son olay
-#     "end" = /assets/by-id/<uuid> adresi)  |  import-binfile (multipart: name, project-id, version=3, file; SSE)
+#     "end" = Transit {"~#uri": ".../assets/by-id/<uuid>"})  |  import-binfile (multipart: name, project-id, file; version alani gonderilmez, 2.18.6 multipart string reddeder; SSE)
 # Kimlik bilgisi: ortamdan PENPOT_ACCESS_TOKEN ya da PENPOT_EMAIL+PENPOT_PASSWORD; yoksa terminalde sorulur.
 # Secret ARGV'ye girmez: curl yapilandirmasi ve JSON govdesi 600 gecici dosyalarda tutulur.
 # Hook cagrilari: app_export list | app_export run <dizin> <proje|id> <include|embed>
@@ -188,7 +188,8 @@ app_export() {
       --data-binary @"$PP_TMP/body.json" -o "$PP_TMP/sse.out" "$STACK_URL/api/rpc/command/export-binfile" ||
       { echo "export istegi basarisiz: $fname"; return 1; }
     url=$(pp_sse_end "$PP_TMP/sse.out" 2>"$PP_TMP/sse.err") || { echo "export hatasi: $fname $(cat "$PP_TMP/sse.err")"; return 1; }
-    uuid=$(printf '%s' "$url" | tr -d '"' | sed 's#.*/##')
+    # end verisi Transit ({"~#uri":".../assets/by-id/<uuid>"}) ya da duz JSON string olabilir
+    uuid=$(printf '%s' "$url" | grep -oE 'by-id/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' | tail -n1 | sed 's#by-id/##')
     case $uuid in
       ????????-????-????-????-????????????) ;;
       *) echo "beklenmeyen export yaniti: $fname"; return 1 ;;
@@ -265,7 +266,7 @@ app_import() {
     i=$((i + 1))
     echo "[$i/$count] $fname"
     ( cd "$dir" && pp_curl -m 900 -H 'Accept: text/event-stream' \
-        --form-string "name=$fname" --form-string "project-id=$pid" --form-string "version=3" \
+        --form-string "name=$fname" --form-string "project-id=$pid" \
         -F "file=@$f;type=application/octet-stream" -o "$PP_TMP/sse.out" "$STACK_URL/api/rpc/command/import-binfile" ) ||
       { echo "import istegi basarisiz: $fname"; return 1; }
     pp_sse_end "$PP_TMP/sse.out" >/dev/null 2>"$PP_TMP/sse.err" || { echo "import hatasi: $fname $(cat "$PP_TMP/sse.err" 2>/dev/null)"; return 1; }

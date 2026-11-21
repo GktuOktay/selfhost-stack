@@ -98,7 +98,7 @@ class H(BaseHTTPRequestHandler):
             assert not (b["includeLibraries"] and b["embedAssets"])
             u = str(uuid.uuid4())
             S.blobs[u] = b"PK\x03\x04" + b["fileId"].encode() + (b"-embed" if b["embedAssets"] else b"-libs")
-            body = ("event: progress\ndata: {}\n\nevent: end\ndata: \"http://x/assets/by-id/%s\"\n\n" % u).encode()
+            body = ("event: progress\ndata: {}\n\nevent: end\ndata: {\"~#uri\":\"http://x/assets/by-id/%s\"}\n\n" % u).encode()
             return self._send(200, body, "text/event-stream")
         if cmd == "import-binfile":
             fields = {}
@@ -189,7 +189,7 @@ class PenpotTransfer(unittest.TestCase):
         self.assertIn("proje olusturuldu: Kopya", r.stdout)
         self.assertEqual(len(S.imports), 2)
         self.assertEqual(S.imports[0]["name"], b"Ana / Tasarim")
-        self.assertEqual(S.imports[0]["version"], b"3")
+        self.assertNotIn("version", S.imports[0])  # Penpot 2.18 multipart version alanini reddeder
         self.assertTrue(S.imports[0]["file"].startswith(b"PK"))
         newp = [p for p in S.projects if p["name"] == "Kopya"][0]
         self.assertEqual(S.imports[0]["project-id"].decode(), newp["id"])
