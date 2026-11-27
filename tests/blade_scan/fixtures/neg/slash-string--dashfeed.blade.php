@@ -1,1 +1,0 @@
-{{ trim('/dashfeed/snapshot.json') }}

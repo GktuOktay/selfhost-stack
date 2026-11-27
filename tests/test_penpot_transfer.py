@@ -236,7 +236,7 @@ class PenpotTransfer(unittest.TestCase):
 
     def test_usage_errors(self):
         self.assertEqual(self.run_stack("export", "penpot").returncode, 1)
-        self.assertEqual(self.run_stack("export", "plane", "x").returncode, 1)
+        self.assertEqual(self.run_stack("export", "nosuch", "x").returncode, 1)
         self.assertEqual(self.run_stack("import", "penpot").returncode, 1)
         self.assertEqual(self.run_stack("export", "penpot", "--bogus").returncode, 1)
 

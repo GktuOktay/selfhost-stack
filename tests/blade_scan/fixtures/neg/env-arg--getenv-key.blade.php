@@ -1,1 +1,0 @@
-{{ getenv('APP_KEY') }}
