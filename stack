@@ -3,8 +3,8 @@
 #
 # Kullanım:
 #   ./stack init
-#   ./stack up|down|status|backup [bookstack|penpot|plane|all]   (argümansız = all)
-#   ./stack logs <bookstack|penpot|plane> [servis] [-f]
+#   ./stack up|down|status|backup [penpot|all]   (argümansız = all)
+#   ./stack logs <penpot> [servis] [-f]
 #   ./stack export penpot --list
 #   ./stack export penpot <proje-adı|id> [-o dizin] [--embed-assets]
 #   ./stack import penpot <arşiv dizini|.tar> [--team <ad>] [--project <ad>]
@@ -36,7 +36,7 @@
 #   app_gate        Opsiyonel. Güvenlik kapısı (REQ-15): 0 = geçti, 6 = geçmedi (yönergeyi stdout'a
 #                   yaz, "HATA:" ile başlatma; stack tek HATA satırını kendisi basar). Diğer kod = 5.
 #   app_status_extra Opsiyonel. `status`ta uygulamanın altına girintili basılacak satırlar
-#                   (örn. "default-login: no", "plane-admin: unclaimed").
+#                   (örn. "default-login: no").
 #   app_up_note     Opsiyonel. Başarı satırından sonra basılır (ilk kurulumda admin e-postası ve
 #                   parolanın .env ANAHTAR ADI; parolanın kendisi asla).
 #   app_export list | app_export run <dizin> <seçici> <include|embed>   Opsiyonel. Proje dışa aktarımı
@@ -52,9 +52,9 @@ LC_ALL=C
 export LC_ALL
 
 ROOT=$(cd "$(dirname "$0")" && pwd -P) || exit 2
-ALL_APPS="bookstack penpot plane"
-SECRET_KEYS="BOOKSTACK_DB_PASSWORD BOOKSTACK_DB_ROOT_PASSWORD BOOKSTACK_APP_KEY BOOKSTACK_ADMIN_PASSWORD PENPOT_SECRET_KEY PENPOT_DB_PASSWORD PLANE_SECRET_KEY PLANE_LIVE_SECRET_KEY PLANE_DB_PASSWORD PLANE_RABBITMQ_PASSWORD PLANE_STORAGE_ACCESS_KEY PLANE_STORAGE_SECRET_KEY"
-ALL_KEYS="BOOKSTACK_PORT BOOKSTACK_DB_PASSWORD BOOKSTACK_DB_ROOT_PASSWORD BOOKSTACK_APP_KEY BOOKSTACK_ADMIN_EMAIL BOOKSTACK_ADMIN_PASSWORD PENPOT_PORT PENPOT_SECRET_KEY PENPOT_DB_PASSWORD PENPOT_EXTRA_FLAGS PLANE_PORT PLANE_SECRET_KEY PLANE_LIVE_SECRET_KEY PLANE_DB_PASSWORD PLANE_RABBITMQ_PASSWORD PLANE_STORAGE_ACCESS_KEY PLANE_STORAGE_SECRET_KEY"
+ALL_APPS="penpot"
+SECRET_KEYS="PENPOT_SECRET_KEY PENPOT_DB_PASSWORD"
+ALL_KEYS="PENPOT_PORT PENPOT_SECRET_KEY PENPOT_DB_PASSWORD PENPOT_EXTRA_FLAGS"
 
 SECRETS_FILE=""
 ENV_TMP=""
@@ -102,17 +102,18 @@ esac
 # ---------- anahtar tabloları ----------
 app_keys() {
   case $1 in
-    bookstack) echo "BOOKSTACK_PORT BOOKSTACK_DB_PASSWORD BOOKSTACK_DB_ROOT_PASSWORD BOOKSTACK_APP_KEY BOOKSTACK_ADMIN_EMAIL BOOKSTACK_ADMIN_PASSWORD" ;;
     penpot) echo "PENPOT_PORT PENPOT_SECRET_KEY PENPOT_DB_PASSWORD" ;;
-    plane) echo "PLANE_PORT PLANE_SECRET_KEY PLANE_LIVE_SECRET_KEY PLANE_DB_PASSWORD PLANE_RABBITMQ_PASSWORD PLANE_STORAGE_ACCESS_KEY PLANE_STORAGE_SECRET_KEY" ;;
   esac
 }
 port_key() {
   case $1 in
-    bookstack) echo BOOKSTACK_PORT ;;
     penpot) echo PENPOT_PORT ;;
-    plane) echo PLANE_PORT ;;
   esac
+}
+# Eski kurulumlardan kalan BookStack/Plane anahtarları local/.env'de durabilir; yok sayılır.
+is_legacy_key() {
+  case $1 in BOOKSTACK_*|PLANE_*) return 0 ;; esac
+  return 1
 }
 is_allowed_key() {
   local k
@@ -133,6 +134,7 @@ load_env() {
     case $key in
       ''|[!A-Z]*|*[!A-Z0-9_]*) die 2 "$f:$n: geçersiz anahtar adı (BÜYÜK_HARF, export/boşluk yok)" ;;
     esac
+    is_legacy_key "$key" && continue
     is_allowed_key "$key" || die 2 "$f:$n: izin verilmeyen anahtar $key"
     [ -z "$(getvar "ENVLINE_$key")" ] || die 2 "$f:$n: $key tekrar tanımlı"
     v2=$val
@@ -186,7 +188,6 @@ build_mask() {
     v=$(getvar "ENV_$k")
     [ ${#v} -ge 6 ] || continue
     printf '%s\n' "$v"
-    [ "$k" = BOOKSTACK_APP_KEY ] && printf '%s\n' "${v#base64:}"
   done | awk '{ print length($0) "\t" $0 }' | sort -rn | cut -f2- > "$SECRETS_FILE"
 }
 mask() {
@@ -480,7 +481,7 @@ import_app() { # app archive team project
   return 0
 }
 
-# all: her uygulamayı dener; ilk başarısızın (bookstack, penpot, plane) kodu çıkış kodudur
+# all: her uygulamayı dener; ilk başarısızın (penpot) kodu çıkış kodudur
 run_each() { # fn app...
   local fn=$1 app rc first=0 multi=0
   shift
@@ -499,10 +500,6 @@ run_each() { # fn app...
 gen_hex() {
   if command -v openssl >/dev/null 2>&1; then openssl rand -hex 24
   else od -An -N24 -tx1 /dev/urandom | tr -d ' \n'; fi
-}
-gen_appkey() {
-  if command -v openssl >/dev/null 2>&1; then printf 'base64:%s' "$(openssl rand -base64 32)"
-  else printf 'base64:%s' "$(head -c 32 /dev/urandom | base64)"; fi
 }
 
 cmd_init() {
@@ -536,7 +533,7 @@ cmd_init() {
     is_allowed_key "$key" || die 2 "$TEMPLATE: izin verilmeyen anahtar"
     [ -z "$(getvar "ENVLINE_$key")" ] || continue
     if [ "$val" = __GENERATE__ ]; then
-      if [ "$key" = BOOKSTACK_APP_KEY ]; then val=$(gen_appkey); else val=$(gen_hex); fi
+      val=$(gen_hex)
       [ -n "$val" ] || die 2 "$key üretilemedi"
     fi
     printf -v "ENVLINE_$key" '%s' "tpl"
@@ -561,7 +558,7 @@ cmd_init() {
   mv -f "$ENV_TMP" "$ENVFILE" || die 2 "$ENVFILE yerine konamadı"
   ENV_TMP=""
   info "init: $n anahtar eklendi:$added"
-  info "init: $(local_hint) mod 600; secret değerleri yazdırılmaz. BookStack admin parolası BOOKSTACK_ADMIN_PASSWORD anahtarında."
+  info "init: $(local_hint) mod 600; secret değerleri yazdırılmaz."
   info "sıradaki: ./stack up"
 }
 
@@ -582,8 +579,8 @@ parse_app_arg() { # komut $@ -> APPS
   a=${1:-all}
   case $a in
     all) APPS=$ALL_APPS ;;
-    bookstack|penpot|plane) APPS=$a ;;
-    *) die 1 "bilinmeyen uygulama '$(safe "$a")' (bookstack|penpot|plane|all)" ;;
+    penpot) APPS=$a ;;
+    *) die 1 "bilinmeyen uygulama '$(safe "$a")' (penpot|all)" ;;
   esac
 }
 
@@ -622,7 +619,6 @@ main() {
       shift
       case $a in
         penpot) ;;
-        bookstack|plane) die 1 "$a proje dışa/içe aktarımını desteklemiyor (yalnız penpot)" ;;
         *) die 1 "bilinmeyen uygulama '$(safe "$a")'" ;;
       esac
       local list=0 sel="" out="" embed=0 team="" proj="" arc=""
@@ -649,9 +645,9 @@ main() {
       fi
       return $? ;;
     logs)
-      [ $# -ge 1 ] || die 1 "logs bir uygulama ister: ./stack logs <bookstack|penpot|plane> [servis] [-f]"
+      [ $# -ge 1 ] || die 1 "logs bir uygulama ister: ./stack logs <penpot> [servis] [-f]"
       case $1 in
-        bookstack|penpot|plane) a=$1 ;;
+        penpot) a=$1 ;;
         all) die 1 "logs tek uygulama ister (all olmaz)" ;;
         *) die 1 "bilinmeyen uygulama '$(safe "$1")'" ;;
       esac

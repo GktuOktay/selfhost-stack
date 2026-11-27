@@ -33,8 +33,8 @@ check() { # check <AC> <description> <command...>: pass if the command succeeds
   if "$@"; then pass "$ac $d"; else fail "$ac $d"; fi
 }
 
-SECRET_KEYS="BOOKSTACK_DB_PASSWORD BOOKSTACK_DB_ROOT_PASSWORD BOOKSTACK_APP_KEY BOOKSTACK_ADMIN_PASSWORD PENPOT_SECRET_KEY PENPOT_DB_PASSWORD PLANE_SECRET_KEY PLANE_LIVE_SECRET_KEY PLANE_DB_PASSWORD PLANE_RABBITMQ_PASSWORD PLANE_STORAGE_ACCESS_KEY PLANE_STORAGE_SECRET_KEY"
-APPS="bookstack penpot plane"
+SECRET_KEYS="PENPOT_SECRET_KEY PENPOT_DB_PASSWORD"
+APPS="penpot"
 
 fmode() { stat -c %a "$1" 2>/dev/null || stat -f %Lp "$1" 2>/dev/null; }
 envval() { sed -n "s/^$2=//p" "$1" | head -n 1; } # file KEY
@@ -126,19 +126,11 @@ elif [ "$CFG_OK" = 1 ]; then
         bad=1
         fail "AC-1 $app: image not pinned to full tag: $img"
       fi
-      case $img in
-        *linuxserver/bookstack*|*pgsty/silo*)
-          grep -Eq '@sha256:[0-9a-f]{64}$' <<<"$img" || { bad=1; fail "AC-1 $app: missing @sha256: $img"; } ;;
-      esac
     done <<EOF
 $(sed -n 's/^ *image: *//p' "$TMP/cfg-$app.yaml" | sed "s/^\"\(.*\)\"\$/\1/")
 EOF
     [ "$n" -gt 0 ] || fail "AC-1 $app: no image lines in config"
     [ "$bad" = 0 ] && [ "$n" -gt 0 ] && pass "AC-1 $app: $n images pinned"
-  done
-  for need in "linuxserver/bookstack" "pgsty/silo"; do
-    cat "$TMP"/cfg-*.yaml 2>/dev/null | grep -E "image:.*$need.*@sha256:[0-9a-f]{64}" >/dev/null &&
-      pass "AC-1 digest present: $need" || fail "AC-1 digest missing: $need"
   done
 fi
 
@@ -178,16 +170,12 @@ if [ "$INIT_RC" -eq 0 ]; then
   sbad=0
   for k in $SECRET_KEYS; do
     v=$(envval "$ENVF" "$k")
-    if [ "$k" = BOOKSTACK_APP_KEY ]; then
-      grep -Eq '^base64:.{44}$' <<<"$v" || { sbad=1; fail "AC-3 $k not base64:+44 chars"; }
-    else
-      grep -Eq '^[0-9a-f]{48,}$' <<<"$v" || { sbad=1; fail "AC-3 $k not hex >= 48"; }
-    fi
+    grep -Eq '^[0-9a-f]{48,}$' <<<"$v" || { sbad=1; fail "AC-3 $k not hex >= 48"; }
     printf '%s\n' "$v" >>"$TMP/vals"
   done
   [ "$(sort "$TMP/vals" | uniq | wc -l | tr -d ' ')" = "$(wc -l <"$TMP/vals" | tr -d ' ')" ] ||
     { sbad=1; fail "AC-3 secrets are not all distinct"; }
-  [ "$sbad" = 0 ] && pass "AC-3 12 secrets: non-empty, hex>=48 (APP_KEY base64:+44), distinct"
+  [ "$sbad" = 0 ] && pass "AC-3 2 secrets: non-empty, hex>=48, distinct"
   # second init: byte-identical
   h1=$(shasum "$ENVF" | cut -d' ' -f1)
   run_stack "$FAKEPATH" "$LOC" init
@@ -195,14 +183,14 @@ if [ "$INIT_RC" -eq 0 ]; then
   [ "$RC" = 0 ] && [ "$h1" = "$h2" ] && pass "AC-3 second init leaves .env byte-identical" || fail "AC-3 second init changed .env (rc $RC)"
   # delete one key: only that line comes back, others byte-identical
   cp "$ENVF" "$TMP/env.before"
-  grep -v '^PLANE_LIVE_SECRET_KEY=' "$TMP/env.before" >"$TMP/env.minus"
+  grep -v '^PENPOT_DB_PASSWORD=' "$TMP/env.before" >"$TMP/env.minus"
   cp "$TMP/env.minus" "$ENVF"
   run_stack "$FAKEPATH" "$LOC" init
   n_new=$(wc -l <"$ENVF" | tr -d ' ')
   n_old=$(wc -l <"$TMP/env.minus" | tr -d ' ')
   head -n "$n_old" "$ENVF" >"$TMP/env.head"
   if [ "$RC" = 0 ] && [ "$n_new" = $((n_old + 1)) ] && cmp -s "$TMP/env.head" "$TMP/env.minus" &&
-    tail -n 1 "$ENVF" | grep -q '^PLANE_LIVE_SECRET_KEY=.\{48,\}$'; then
+    tail -n 1 "$ENVF" | grep -q '^PENPOT_DB_PASSWORD=.\{48,\}$'; then
     pass "AC-3 deleted key re-added alone; other lines byte-identical"
   else
     fail "AC-3 re-adding a deleted key altered other lines"
@@ -216,12 +204,18 @@ if [ "$INIT_RC" -eq 0 ]; then
 #!/bin/bash
 . "$1"
 load_env "$2"
-printf '%s' "$ENV_BOOKSTACK_APP_KEY"
+printf '%s' "$ENV_PENPOT_EXTRA_FLAGS"
 EOF
-  want=$(envval "$ENVF" BOOKSTACK_APP_KEY)
-  got=$(/bin/bash "$TMP/libtest.sh" "$TMP/stack_lib.sh" "$ENVF" 2>/dev/null)
-  case $want in *=*) ;; *) fail "AC-3 fixture: BOOKSTACK_APP_KEY has no '=' to test" ;; esac
-  [ "$got" = "$want" ] && pass "AC-3 value containing '=' (BOOKSTACK_APP_KEY) parsed exactly" || fail "AC-3 '=' in value mis-parsed"
+  want="a=b=c"
+  sed "s|^PENPOT_EXTRA_FLAGS=.*|PENPOT_EXTRA_FLAGS=$want|" "$ENVF" >"$TMP/env.eq"
+  got=$(/bin/bash "$TMP/libtest.sh" "$TMP/stack_lib.sh" "$TMP/env.eq" 2>/dev/null)
+  [ "$got" = "$want" ] && pass "AC-3 value containing '=' (PENPOT_EXTRA_FLAGS) parsed exactly" || fail "AC-3 '=' in value mis-parsed"
+  # leftover BookStack/Plane keys from older installs are ignored, not an error
+  { cat "$TMP/env.before"; printf 'BOOKSTACK_PORT=8701\nPLANE_SECRET_KEY=abc\n'; } >"$TMP/legacy.env"
+  mkdir -p "$TMP/legacy" && chmod 700 "$TMP/legacy" && cp "$TMP/legacy.env" "$TMP/legacy/.env"
+  run_stack "$FAKEPATH" "$TMP/legacy" init
+  [ "$RC" = 0 ] && pass "AC-3 legacy BOOKSTACK_/PLANE_ keys in .env ignored (init exit 0)" || fail "AC-3 legacy keys rejected (rc $RC)"
+  grep -q '^BOOKSTACK_PORT=8701$' "$TMP/legacy/.env" && pass "AC-3 legacy keys left untouched" || fail "AC-3 legacy keys altered"
   # rejected lines, up must exit 2 with <file>:<line> and never reach docker compose
   for case_ in 'export X=1' 'NOEQUALSLINE' 'lower=1' 'X=$(touch '"$TMP"'/pwn)'; do
     cp "$TMP/env.before" "$TMP/bad/.env" 2>/dev/null || { mkdir -p "$TMP/bad" && cp "$TMP/env.before" "$TMP/bad/.env"; }
@@ -229,7 +223,7 @@ EOF
     printf '%s\n' "$case_" >>"$TMP/bad/.env"
     ln_no=$(wc -l <"$TMP/bad/.env" | tr -d ' ')
     : >"$FAKELOG"
-    run_stack "$FAKEPATH" "$TMP/bad" up bookstack
+    run_stack "$FAKEPATH" "$TMP/bad" up penpot
     if [ "$RC" = 2 ] && grep -q "bad/.env:$ln_no:" "$TMP/err" && one_hata &&
       ! grep -Ev '^(compose version|info)$' "$FAKELOG" | grep -q .; then
       pass "AC-3 bad line rejected with <file>:$ln_no (exit 2): ${case_%%/*}"
@@ -302,10 +296,9 @@ if [ "$CFG_OK" = 1 ]; then
   done
   cfgvals "$pc" PENPOT_TELEMETRY_ENABLED | grep -qx false && pass "AC-6 PENPOT_TELEMETRY_ENABLED=false" || fail "AC-6 PENPOT_TELEMETRY_ENABLED not false"
   # depends_on validity is covered by `config` exit 0 (AC-1)
-  cfgvals "$TMP/cfg-plane.yaml" ENABLE_SIGNUP | sort -u | grep -qx '0' && pass "AC-6 plane ENABLE_SIGNUP=0 (registration key closed)" || fail "AC-6 plane ENABLE_SIGNUP not 0"
   # URLs follow the port; port change flows to config
-  sed -e 's/^BOOKSTACK_PORT=.*/BOOKSTACK_PORT=18701/' -e 's/^PENPOT_PORT=.*/PENPOT_PORT=18702/' -e 's/^PLANE_PORT=.*/PLANE_PORT=18703/' "$ENVF" >"$TMP/env.ports"
-  for pair in "bookstack:APP_URL:8701" "penpot:PENPOT_PUBLIC_URI:8702" "plane:WEB_URL:8703" "plane:CORS_ALLOWED_ORIGINS:8703"; do
+  sed -e 's/^PENPOT_PORT=.*/PENPOT_PORT=18702/' "$ENVF" >"$TMP/env.ports"
+  for pair in "penpot:PENPOT_PUBLIC_URI:8702"; do
     app=${pair%%:*}
     rest=${pair#*:}
     key=${rest%%:*}
@@ -326,11 +319,7 @@ echo "== AC-7 (REQ-12) secrets come from local/.env, no upstream defaults"
 if [ "$CFG_OK" = 1 ]; then
   # app:CONFIG_KEY:ENV_KEY
   for t in \
-    bookstack:APP_KEY:BOOKSTACK_APP_KEY bookstack:DB_PASSWORD:BOOKSTACK_DB_PASSWORD bookstack:MARIADB_PASSWORD:BOOKSTACK_DB_PASSWORD \
-    penpot:PENPOT_SECRET_KEY:PENPOT_SECRET_KEY penpot:POSTGRES_PASSWORD:PENPOT_DB_PASSWORD \
-    plane:SECRET_KEY:PLANE_SECRET_KEY plane:LIVE_SERVER_SECRET_KEY:PLANE_LIVE_SECRET_KEY plane:POSTGRES_PASSWORD:PLANE_DB_PASSWORD \
-    plane:RABBITMQ_DEFAULT_PASS:PLANE_RABBITMQ_PASSWORD plane:AWS_ACCESS_KEY_ID:PLANE_STORAGE_ACCESS_KEY \
-    plane:AWS_SECRET_ACCESS_KEY:PLANE_STORAGE_SECRET_KEY; do
+    penpot:PENPOT_SECRET_KEY:PENPOT_SECRET_KEY penpot:POSTGRES_PASSWORD:PENPOT_DB_PASSWORD; do
     app=${t%%:*}
     rest=${t#*:}
     ck=${rest%%:*}
@@ -351,17 +340,11 @@ EOF
       fail "AC-7 $app $ck != $ek (occurrences $n)"
     fi
   done
-  # keys the spec lists but that may not exist in a given compose file
-  for k in RABBITMQ_PASSWORD; do
-    if cat "$TMP"/cfg-*.yaml | grep -q "^ *$k:"; then
-      cfgvals "$TMP/cfg-plane.yaml" "$k" | sort -u | grep -qx "$(envval "$ENVF" PLANE_RABBITMQ_PASSWORD)" && pass "AC-7 $k == PLANE_RABBITMQ_PASSWORD" || fail "AC-7 $k mismatch"
-    fi
-  done
 else
   fail "AC-7 skipped: no config (see AC-1)"
 fi
 # missing/empty required key: up exits 2 before any docker call (fake docker records calls)
-for k in BOOKSTACK_DB_PASSWORD PENPOT_SECRET_KEY PLANE_STORAGE_SECRET_KEY; do
+for k in PENPOT_DB_PASSWORD PENPOT_SECRET_KEY; do
   for mode in missing empty; do
     mkdir -p "$TMP/miss"
     chmod 700 "$TMP/miss"
@@ -388,21 +371,20 @@ exp() { # exp <description> <expected_rc> <path> args...
 exp "no command" 1 "$FAKEPATH"
 exp "unknown command" 1 "$FAKEPATH" frobnicate
 exp "unknown app (up)" 1 "$FAKEPATH" up nosuchapp
+exp "removed app (bookstack)" 1 "$FAKEPATH" up bookstack
+exp "removed app (plane)" 1 "$FAKEPATH" logs plane
 exp "unknown app (backup)" 1 "$FAKEPATH" backup nosuchapp
-exp "two apps" 1 "$FAKEPATH" up bookstack penpot
+exp "two apps" 1 "$FAKEPATH" up penpot all
 exp "logs all" 1 "$FAKEPATH" logs all
 exp "logs without app" 1 "$FAKEPATH" logs
 exp "init with argument" 1 "$FAKEPATH" init x
 for badport in 80 70000 abc; do
   mkdir -p "$TMP/port"
   chmod 700 "$TMP/port"
-  sed "s/^BOOKSTACK_PORT=.*/BOOKSTACK_PORT=$badport/" "$ENVF" >"$TMP/port/.env"
+  sed "s/^PENPOT_PORT=.*/PENPOT_PORT=$badport/" "$ENVF" >"$TMP/port/.env"
   run_stack "$FAKEPATH" "$TMP/port" up
-  if [ "$RC" = 2 ] && one_hata && grep -q 'BOOKSTACK_PORT' "$TMP/err"; then pass "AC-8 port $badport rejected (exit 2)"; else fail "AC-8 port $badport: rc $RC"; fi
+  if [ "$RC" = 2 ] && one_hata && grep -q 'PENPOT_PORT' "$TMP/err"; then pass "AC-8 port $badport rejected (exit 2)"; else fail "AC-8 port $badport: rc $RC"; fi
 done
-sed "s/^PENPOT_PORT=.*/PENPOT_PORT=8701/" "$ENVF" >"$TMP/port/.env"
-run_stack "$FAKEPATH" "$TMP/port" status
-if [ "$RC" = 2 ] && one_hata; then pass "AC-8 duplicate ports rejected (exit 2)"; else fail "AC-8 duplicate ports: rc $RC"; fi
 # no local dir
 run_stack "$FAKEPATH" "$TMP/nolocal" status
 if [ "$RC" = 2 ] && one_hata && grep -q 'init' "$TMP/err"; then pass "AC-8 no local/.env: exit 2, mentions init"; else fail "AC-8 no local/.env: rc $RC"; fi
@@ -421,7 +403,7 @@ mkbin() { # mkbin <dir> <skip...>
 }
 tool_case() { # tool_case <label> <expected word> <bindir>
   : >"$FAKELOG"
-  run_stack "$3" "$LOC" up bookstack
+  run_stack "$3" "$LOC" up penpot
   if [ "$RC" = 2 ] && one_hata && grep -q "$2" "$TMP/err"; then pass "AC-8 $1 missing -> exit 2, names '$2'"; else fail "AC-8 $1 missing: rc $RC"; fi
 }
 mkbin "$TMP/bin-nodocker"
@@ -441,9 +423,9 @@ if [ "$RC" = 2 ] && one_hata && grep -q 'openssl' "$TMP/err"; then pass "AC-8 op
 
 # ---------- AC-9 ----------
 echo "== AC-9 (REQ-18) orphan volume warning"
-FAKE_VOLUMES="selfhost-bookstack_config" run_stack "$FAKEPATH" "$TMP/orphan" init
-if [ "$RC" = 0 ] && grep -q 'UYARI.*selfhost-bookstack' "$TMP/out" && [ -f "$TMP/orphan/.env" ] &&
-  [ -n "$(envval "$TMP/orphan/.env" BOOKSTACK_DB_PASSWORD)" ]; then
+FAKE_VOLUMES="selfhost-penpot_assets" run_stack "$FAKEPATH" "$TMP/orphan" init
+if [ "$RC" = 0 ] && grep -q 'UYARI.*selfhost-penpot' "$TMP/out" && [ -f "$TMP/orphan/.env" ] &&
+  [ -n "$(envval "$TMP/orphan/.env" PENPOT_DB_PASSWORD)" ]; then
   pass "AC-9 warning printed, exit 0, secrets generated"
 else
   fail "AC-9 orphan-volume warning (rc $RC)"
@@ -456,12 +438,11 @@ echo "== AC-10 (REQ-23) NOTICE and upstream headers"
 if [ -f "$ROOT/NOTICE" ]; then
   N=$ROOT/NOTICE
   grep -q 'penpot' "$N" && grep -q '2\.18\.6' "$N" && grep -q 'MPL-2\.0' "$N" && pass "AC-10 NOTICE: penpot repo/tag/license" || fail "AC-10 NOTICE lacks penpot repo/tag/license"
-  grep -q 'makeplane/plane' "$N" && grep -q 'v1\.4\.3' "$N" && grep -q 'AGPL-3\.0' "$N" && pass "AC-10 NOTICE: plane repo/tag/license" || fail "AC-10 NOTICE lacks plane repo/tag/license"
-  grep -qi 'bookstack' "$N" && grep -q 'v26\.09\.2' "$N" && grep -qE 'GPL-3\.0|MIT' "$N" && pass "AC-10 NOTICE: bookstack repo/tag/license" || fail "AC-10 NOTICE lacks bookstack repo/tag/license"
+  grep -qi 'bookstack\|plane' "$N" && fail "AC-10 NOTICE still lists removed components" || pass "AC-10 NOTICE lists only penpot"
 else
   fail "AC-10 NOTICE file missing (T-7 deliverable)"
 fi
-for app in penpot plane; do
+for app in penpot; do
   h=$(head -n 8 "$ROOT/stacks/$app/compose.yaml")
   if grep -q 'https://' <<<"$h" && grep -Eiq 'tag|v?[0-9]+\.[0-9]+\.[0-9]+' <<<"$h" && grep -q 'License' <<<"$h"; then
     pass "AC-10 $app compose header: URL + tag + license"
@@ -470,11 +451,10 @@ for app in penpot plane; do
   fi
 done
 hp=$(head -n 8 "$ROOT/stacks/penpot/compose.yaml")
-hl=$(head -n 8 "$ROOT/stacks/plane/compose.yaml")
-if grep -q 'MPL-2\.0' <<<"$hp" && grep -q 'AGPL-3\.0' <<<"$hl"; then
-  pass "AC-10 header licenses MPL-2.0 (penpot) / AGPL-3.0 (plane)"
+if grep -q 'MPL-2\.0' <<<"$hp"; then
+  pass "AC-10 header license MPL-2.0 (penpot)"
 else
-  fail "AC-10 header license ids"
+  fail "AC-10 header license id"
 fi
 
 # ---------- summary ----------

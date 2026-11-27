@@ -1,1 +1,0 @@
-<base href="http://x/">

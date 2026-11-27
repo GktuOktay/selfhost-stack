@@ -1,1 +1,0 @@
-<SCRIPT src=x></script>

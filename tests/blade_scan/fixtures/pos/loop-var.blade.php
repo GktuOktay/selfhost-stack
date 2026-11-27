@@ -1,3 +1,0 @@
-@if($loop)
-x
-@endif

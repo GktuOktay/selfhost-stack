@@ -1,3 +1,0 @@
-@verbatim
-x
-@endverbatim

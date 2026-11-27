@@ -1,1 +1,0 @@
-{{ $sortedVisibleShelfBooks[0] }}
